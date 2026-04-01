@@ -1,46 +1,190 @@
-import { Submission, StatusDocumento } from "./types";
+import { supabase } from "@/integrations/supabase/client";
+import { Submission, StatusDocumento, formatFileName, DOC_TYPE_LABELS } from "./types";
 
-const STORAGE_KEY = "pro3_submissions";
+// ===== SUBMISSIONS =====
 
-export function getSubmissions(): Submission[] {
-  const data = localStorage.getItem(STORAGE_KEY);
-  return data ? JSON.parse(data) : [];
-}
+export async function getSubmissions(): Promise<Submission[]> {
+  const { data, error } = await supabase
+    .from("submissions")
+    .select("*")
+    .order("data_envio", { ascending: false });
 
-export function addSubmission(submission: Submission): void {
-  const submissions = getSubmissions();
-  submissions.push(submission);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(submissions));
-}
-
-export function updateSubmissionStatus(id: string, status: StatusDocumento): void {
-  const submissions = getSubmissions();
-  const idx = submissions.findIndex((s) => s.id === id);
-  if (idx !== -1) {
-    submissions[idx].status = status;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(submissions));
+  if (error) {
+    console.error("Error fetching submissions:", error);
+    return [];
   }
+
+  return (data || []).map(mapDbToSubmission);
 }
 
-export function getSubmissionsByCliente(cliente: string): Submission[] {
-  return getSubmissions().filter((s) => s.cliente === cliente);
+export async function getSubmissionWithDocs(id: string): Promise<Submission | null> {
+  const { data: sub, error } = await supabase
+    .from("submissions")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !sub) return null;
+
+  const { data: docs } = await supabase
+    .from("documents")
+    .select("*")
+    .eq("submission_id", id);
+
+  return mapDbToSubmission(sub, docs || []);
 }
 
-export function getSubmissionById(id: string): Submission | undefined {
-  return getSubmissions().find((s) => s.id === id);
+export async function addSubmission(
+  submission: Omit<Submission, "id" | "dataEnvio" | "status" | "documentos">,
+  files: Record<string, File>
+): Promise<Submission | null> {
+  // Insert submission
+  const { data: sub, error } = await supabase
+    .from("submissions")
+    .insert({
+      cliente: submission.cliente,
+      campanha: submission.campanha,
+      numero_pi: submission.numeroPi,
+      tipo_veiculo: submission.tipoVeiculo,
+      outro_tipo: submission.outroTipo || null,
+      nome_veiculo: submission.nomeVeiculo,
+      cidade: submission.cidade,
+      contato_nome: submission.contatoNome,
+      contato_email: submission.contatoEmail,
+      contato_telefone: submission.contatoTelefone,
+      observacoes: submission.observacoes || null,
+      status: "pendente",
+    })
+    .select()
+    .single();
+
+  if (error || !sub) {
+    console.error("Error creating submission:", error);
+    return null;
+  }
+
+  // Upload files and create document records
+  const docRecords: Array<{ doc_type: string; doc_label: string; file_name: string; storage_path: string }> = [];
+
+  for (const [docKey, file] of Object.entries(files)) {
+    if (!file) continue;
+
+    const ext = file.name.substring(file.name.lastIndexOf("."));
+    const standardizedName = formatFileName(
+      submission.numeroPi,
+      submission.nomeVeiculo,
+      submission.cidade,
+      docKey,
+      ext
+    );
+
+    const storagePath = `${sub.cliente}/${sub.campanha}/${sub.numero_pi}/${standardizedName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("documentos")
+      .upload(storagePath, file, { upsert: true });
+
+    if (uploadError) {
+      console.error(`Error uploading ${docKey}:`, uploadError);
+      continue;
+    }
+
+    docRecords.push({
+      doc_type: docKey,
+      doc_label: DOC_TYPE_LABELS[docKey] || docKey,
+      file_name: standardizedName,
+      storage_path: storagePath,
+    });
+  }
+
+  if (docRecords.length > 0) {
+    await supabase.from("documents").insert(
+      docRecords.map((d) => ({ ...d, submission_id: sub.id }))
+    );
+  }
+
+  return getSubmissionWithDocs(sub.id);
 }
 
-// File storage simulation - in production use Supabase Storage
-const FILE_STORAGE_KEY = "pro3_files";
+export async function updateSubmissionStatus(id: string, status: StatusDocumento): Promise<void> {
+  const { error } = await supabase
+    .from("submissions")
+    .update({ status })
+    .eq("id", id);
 
-export function storeFileReference(submissionId: string, docType: string, fileName: string): void {
-  const files = JSON.parse(localStorage.getItem(FILE_STORAGE_KEY) || "{}");
-  if (!files[submissionId]) files[submissionId] = {};
-  files[submissionId][docType] = fileName;
-  localStorage.setItem(FILE_STORAGE_KEY, JSON.stringify(files));
+  if (error) console.error("Error updating status:", error);
 }
 
-export function getFileReferences(submissionId: string): Record<string, string> {
-  const files = JSON.parse(localStorage.getItem(FILE_STORAGE_KEY) || "{}");
-  return files[submissionId] || {};
+export function getDocumentUrl(storagePath: string): string {
+  const { data } = supabase.storage.from("documentos").getPublicUrl(storagePath);
+  return data.publicUrl;
+}
+
+// ===== MAPPERS =====
+
+interface DbSubmission {
+  id: string;
+  cliente: string;
+  campanha: string;
+  numero_pi: string;
+  tipo_veiculo: string;
+  outro_tipo: string | null;
+  nome_veiculo: string;
+  cidade: string;
+  contato_nome: string;
+  contato_email: string;
+  contato_telefone: string;
+  status: string;
+  observacoes: string | null;
+  data_envio: string;
+}
+
+interface DbDocument {
+  id: string;
+  submission_id: string;
+  doc_type: string;
+  doc_label: string;
+  file_name: string;
+  storage_path: string;
+}
+
+function mapDbToSubmission(sub: DbSubmission, docs: DbDocument[] = []): Submission {
+  const documentos: Submission["documentos"] = {};
+  const certidoes: string[] = [];
+
+  for (const doc of docs) {
+    if (doc.doc_type.startsWith("certidao")) {
+      certidoes.push(doc.file_name);
+    } else if (doc.doc_type === "piAssinado") {
+      documentos.piAssinado = doc.file_name;
+    } else if (doc.doc_type === "declaracaoSimplesNacional") {
+      documentos.declaracaoSimplesNacional = doc.file_name;
+    } else if (doc.doc_type === "comprovantesExibicao") {
+      documentos.comprovantesExibicao = doc.file_name;
+    } else if (doc.doc_type === "declaracaoArtigo299") {
+      documentos.declaracaoArtigo299 = doc.file_name;
+    } else if (doc.doc_type === "tabelaPrecoAssinada") {
+      documentos.tabelaPrecoAssinada = doc.file_name;
+    }
+  }
+
+  if (certidoes.length > 0) documentos.certidoesNegativas = certidoes;
+
+  return {
+    id: sub.id,
+    cliente: sub.cliente as any,
+    campanha: sub.campanha,
+    numeroPi: sub.numero_pi,
+    tipoVeiculo: sub.tipo_veiculo as any,
+    outroTipo: sub.outro_tipo || undefined,
+    nomeVeiculo: sub.nome_veiculo,
+    cidade: sub.cidade,
+    contatoNome: sub.contato_nome,
+    contatoEmail: sub.contato_email,
+    contatoTelefone: sub.contato_telefone,
+    documentos,
+    status: sub.status as StatusDocumento,
+    dataEnvio: sub.data_envio,
+    observacoes: sub.observacoes || undefined,
+  };
 }
