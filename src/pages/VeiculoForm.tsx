@@ -7,9 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Cliente, TipoVeiculo, CAMPANHAS, Submission, formatFileName } from "@/lib/types";
-import { addSubmission, storeFileReference } from "@/lib/store";
+import { Cliente, TipoVeiculo, CAMPANHAS } from "@/lib/types";
+import { addSubmission } from "@/lib/store";
 import SubmissionReceipt from "@/components/SubmissionReceipt";
+import { Submission } from "@/lib/types";
 
 const CLIENTES: Cliente[] = ["ALESC", "Prefeitura de Xanxerê", "Prefeitura de Chapecó"];
 const TIPOS_VEICULO: TipoVeiculo[] = ["Jornal", "Rádio", "Televisão", "Portal", "Mídia Externa", "Outro"];
@@ -25,6 +26,7 @@ const VeiculoForm = () => {
   const [step, setStep] = useState(1);
   const [showReceipt, setShowReceipt] = useState(false);
   const [submittedData, setSubmittedData] = useState<Submission | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [cliente, setCliente] = useState<Cliente | "">("");
   const [campanha, setCampanha] = useState("");
@@ -52,24 +54,10 @@ const VeiculoForm = () => {
   });
 
   const handleFileChange = (key: string, file: File | null) => {
-    setDocs((prev) => ({
-      ...prev,
-      [key]: { file, name: file?.name || "" },
-    }));
+    setDocs((prev) => ({ ...prev, [key]: { file, name: file?.name || "" } }));
   };
 
   const campanhasDisponiveis = cliente ? CAMPANHAS[cliente] : [];
-
-  const getFileExtension = (filename: string) => {
-    const idx = filename.lastIndexOf(".");
-    return idx !== -1 ? filename.substring(idx) : "";
-  };
-
-  const buildStandardizedName = (key: string, originalName: string) => {
-    if (!originalName) return "";
-    const ext = getFileExtension(originalName);
-    return formatFileName(numeroPi, nomeVeiculo, cidade, key, ext);
-  };
 
   const validateStep1 = () => {
     if (!cliente || !campanha || !numeroPi || !tipoVeiculo || !nomeVeiculo || !cidade) {
@@ -91,59 +79,50 @@ const VeiculoForm = () => {
     return true;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!docs.piAssinado.file) {
       toast({ title: "Documento obrigatório", description: "O PI Assinado é obrigatório.", variant: "destructive" });
       return;
     }
 
-    const id = crypto.randomUUID();
+    setIsSubmitting(true);
 
-    // Build standardized file names
-    const stdName = (key: string) => {
-      const d = docs[key];
-      return d?.file ? buildStandardizedName(key, d.name) : undefined;
-    };
-
-    const submission: Submission = {
-      id,
-      cliente: cliente as Cliente,
-      campanha,
-      numeroPi,
-      tipoVeiculo: tipoVeiculo as TipoVeiculo,
-      outroTipo: tipoVeiculo === "Outro" ? outroTipo : undefined,
-      nomeVeiculo,
-      cidade,
-      contatoNome,
-      contatoEmail,
-      contatoTelefone,
-      documentos: {
-        piAssinado: stdName("piAssinado"),
-        declaracaoSimplesNacional: stdName("declaracaoSimplesNacional"),
-        comprovantesExibicao: stdName("comprovantesExibicao"),
-        declaracaoArtigo299: stdName("declaracaoArtigo299"),
-        certidoesNegativas: [
-          stdName("certidao1"), stdName("certidao2"), stdName("certidao3"),
-          stdName("certidao4"), stdName("certidao5"),
-        ].filter(Boolean) as string[],
-        tabelaPrecoAssinada: stdName("tabelaPrecoAssinada"),
-      },
-      status: "pendente",
-      dataEnvio: new Date().toISOString(),
-      observacoes: observacoes || undefined,
-    };
-
-    addSubmission(submission);
-
+    // Collect files
+    const files: Record<string, File> = {};
     Object.entries(docs).forEach(([key, val]) => {
-      if (val.file) {
-        const standardized = buildStandardizedName(key, val.name);
-        storeFileReference(id, key, standardized);
-      }
+      if (val.file) files[key] = val.file;
     });
 
-    setSubmittedData(submission);
-    setShowReceipt(true);
+    try {
+      const result = await addSubmission(
+        {
+          cliente: cliente as Cliente,
+          campanha,
+          numeroPi,
+          tipoVeiculo: tipoVeiculo as TipoVeiculo,
+          outroTipo: tipoVeiculo === "Outro" ? outroTipo : undefined,
+          nomeVeiculo,
+          cidade,
+          contatoNome,
+          contatoEmail,
+          contatoTelefone,
+          observacoes: observacoes || undefined,
+        },
+        files
+      );
+
+      if (result) {
+        setSubmittedData(result);
+        setShowReceipt(true);
+      } else {
+        toast({ title: "Erro", description: "Falha ao enviar documentação. Tente novamente.", variant: "destructive" });
+      }
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Erro", description: "Falha ao enviar documentação.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (showReceipt && submittedData) {
@@ -287,14 +266,7 @@ const VeiculoForm = () => {
             <p className="text-sm text-muted-foreground">Anexe os documentos necessários. Campos com * são obrigatórios.</p>
             <div className="space-y-4">
               {docFields.map(({ key, label, required, desc }) => (
-                <FileUploadField
-                  key={key}
-                  label={label}
-                  description={desc}
-                  required={required}
-                  file={docs[key]?.file}
-                  onChange={(f) => handleFileChange(key, f)}
-                />
+                <FileUploadField key={key} label={label} description={desc} required={required} file={docs[key]?.file} onChange={(f) => handleFileChange(key, f)} />
               ))}
               <div className="border-t pt-4">
                 <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
@@ -303,21 +275,15 @@ const VeiculoForm = () => {
                 </h3>
                 <div className="space-y-3">
                   {certidaoLabels.map((label, i) => (
-                    <FileUploadField
-                      key={`certidao${i + 1}`}
-                      label={label}
-                      required={false}
-                      file={docs[`certidao${i + 1}`]?.file}
-                      onChange={(f) => handleFileChange(`certidao${i + 1}`, f)}
-                    />
+                    <FileUploadField key={`certidao${i + 1}`} label={label} required={false} file={docs[`certidao${i + 1}`]?.file} onChange={(f) => handleFileChange(`certidao${i + 1}`, f)} />
                   ))}
                 </div>
               </div>
             </div>
             <div className="flex justify-between pt-4">
               <Button variant="outline" onClick={() => setStep(2)}>Voltar</Button>
-              <Button onClick={handleSubmit} className="gap-2">
-                <Upload className="h-4 w-4" /> Enviar Documentação
+              <Button onClick={handleSubmit} className="gap-2" disabled={isSubmitting}>
+                <Upload className="h-4 w-4" /> {isSubmitting ? "Enviando..." : "Enviar Documentação"}
               </Button>
             </div>
           </div>
@@ -348,9 +314,7 @@ const FileUploadField = ({
         <>
           <FileText className="h-4 w-4 text-success shrink-0" />
           <span className="text-xs text-foreground truncate max-w-[150px]">{file.name}</span>
-          <Button variant="ghost" size="sm" className="text-destructive h-7 px-2" onClick={() => onChange(null)}>
-            ✕
-          </Button>
+          <Button variant="ghost" size="sm" className="text-destructive h-7 px-2" onClick={() => onChange(null)}>✕</Button>
         </>
       ) : (
         <label className="cursor-pointer">

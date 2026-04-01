@@ -1,7 +1,10 @@
-import { ArrowLeft, FileText, CheckCircle2, Clock, AlertCircle, Eye, User, Mail, Phone, Download, MapPin } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ArrowLeft, FileText, CheckCircle2, Clock, AlertCircle, Eye, User, Mail, Phone, ExternalLink, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Submission, StatusDocumento } from "@/lib/types";
+import { getDocumentUrl } from "@/lib/store";
+import { supabase } from "@/integrations/supabase/client";
 
 const statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock; className: string }> = {
   pendente: { label: "Pendente", icon: Clock, className: "bg-warning/10 text-warning border-warning/20" },
@@ -9,6 +12,14 @@ const statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock;
   corrigido: { label: "Corrigido", icon: CheckCircle2, className: "bg-success/10 text-success border-success/20" },
   rejeitado: { label: "Rejeitado", icon: AlertCircle, className: "bg-destructive/10 text-destructive border-destructive/20" },
 };
+
+interface DbDocument {
+  id: string;
+  doc_type: string;
+  doc_label: string;
+  file_name: string;
+  storage_path: string;
+}
 
 interface Props {
   submission: Submission;
@@ -19,14 +30,18 @@ interface Props {
 const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
   const cfg = statusConfig[submission.status];
   const StatusIcon = cfg.icon;
+  const [documents, setDocuments] = useState<DbDocument[]>([]);
 
-  const docLabels: Record<string, string> = {
-    piAssinado: "PI Assinado",
-    declaracaoSimplesNacional: "Declaração Simples Nacional",
-    comprovantesExibicao: "Comprovantes de Exibição",
-    declaracaoArtigo299: "Declaração do Artigo 299",
-    tabelaPrecoAssinada: "Tabela de Preço Assinada",
-  };
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase
+        .from("documents")
+        .select("*")
+        .eq("submission_id", submission.id);
+      if (data) setDocuments(data);
+    };
+    load();
+  }, [submission.id]);
 
   const allStatuses: StatusDocumento[] = ["pendente", "em_analise", "corrigido", "rejeitado"];
 
@@ -50,10 +65,8 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
 
       <div className="max-w-4xl mx-auto px-6 py-6 space-y-6 animate-fade-in">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <span>{submission.cliente}</span>
-          <span>/</span>
-          <span>{submission.campanha}</span>
-          <span>/</span>
+          <span>{submission.cliente}</span><span>/</span>
+          <span>{submission.campanha}</span><span>/</span>
           <span className="text-foreground font-medium">PI {submission.numeroPi}</span>
         </div>
 
@@ -71,23 +84,11 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
 
           <div className="bg-card rounded-lg border p-5 space-y-3">
             <h3 className="text-sm font-semibold text-foreground">Contato do Veículo</h3>
-            <div className="flex items-center gap-2 text-sm">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">{submission.contatoNome}</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Mail className="h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">{submission.contatoEmail}</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Phone className="h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">{submission.contatoTelefone}</span>
-            </div>
+            <div className="flex items-center gap-2 text-sm"><User className="h-4 w-4 text-muted-foreground" /><span className="text-foreground">{submission.contatoNome}</span></div>
+            <div className="flex items-center gap-2 text-sm"><Mail className="h-4 w-4 text-muted-foreground" /><span className="text-foreground">{submission.contatoEmail}</span></div>
+            <div className="flex items-center gap-2 text-sm"><Phone className="h-4 w-4 text-muted-foreground" /><span className="text-foreground">{submission.contatoTelefone}</span></div>
             {submission.cidade && (
-              <div className="flex items-center gap-2 text-sm">
-                <MapPin className="h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">{submission.cidade}</span>
-              </div>
+              <div className="flex items-center gap-2 text-sm"><MapPin className="h-4 w-4 text-muted-foreground" /><span className="text-foreground">{submission.cidade}</span></div>
             )}
             {submission.observacoes && (
               <div className="pt-2 border-t">
@@ -98,23 +99,33 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
           </div>
         </div>
 
-        {/* Documents with view capability */}
+        {/* Real Documents from Storage */}
         <div className="bg-card rounded-lg border p-5 space-y-4">
-          <h3 className="text-sm font-semibold text-foreground">Documentos Anexados</h3>
-          <div className="space-y-2">
-            {Object.entries(submission.documentos).map(([key, val]) => {
-              if (!val || (Array.isArray(val) && val.length === 0)) return null;
-              const label = docLabels[key] || key;
-              if (Array.isArray(val)) {
-                return val.map((v, i) => (
-                  <DocRow key={`${key}-${i}`} label={`Certidão ${i + 1}`} value={v} />
-                ));
-              }
-              return <DocRow key={key} label={label} value={val as string} />;
-            })}
-          </div>
-          {Object.values(submission.documentos).every(v => !v || (Array.isArray(v) && v.length === 0)) && (
-            <p className="text-sm text-muted-foreground text-center py-4">Nenhum documento anexado.</p>
+          <h3 className="text-sm font-semibold text-foreground">Documentos Anexados ({documents.length})</h3>
+          {documents.length > 0 ? (
+            <div className="space-y-2">
+              {documents.map((doc) => (
+                <div key={doc.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                  <FileText className="h-4 w-4 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">{doc.doc_label}</p>
+                    <p className="text-xs text-muted-foreground truncate">{doc.file_name}</p>
+                  </div>
+                  <a
+                    href={getDocumentUrl(doc.storage_path)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0"
+                  >
+                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-primary gap-1">
+                      <ExternalLink className="h-3 w-3" /> Abrir
+                    </Button>
+                  </a>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">Nenhum documento encontrado.</p>
           )}
         </div>
 
@@ -127,15 +138,9 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
               const Icon = c.icon;
               const isActive = submission.status === st;
               return (
-                <Button
-                  key={st}
-                  variant={isActive ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => onStatusUpdate(submission.id, st)}
-                  disabled={isActive}
-                >
-                  <Icon className="h-3 w-3 mr-1.5" />
-                  {c.label}
+                <Button key={st} variant={isActive ? "default" : "outline"} size="sm"
+                  onClick={() => onStatusUpdate(submission.id, st)} disabled={isActive}>
+                  <Icon className="h-3 w-3 mr-1.5" />{c.label}
                 </Button>
               );
             })}
@@ -150,22 +155,6 @@ const InfoRow = ({ label, value }: { label: string; value: string }) => (
   <div className="flex justify-between text-sm">
     <span className="text-muted-foreground">{label}</span>
     <span className="text-foreground text-right max-w-[60%]">{value}</span>
-  </div>
-);
-
-const DocRow = ({ label, value }: { label: string; value: string }) => (
-  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-    <FileText className="h-4 w-4 text-primary shrink-0" />
-    <div className="flex-1 min-w-0">
-      <p className="text-sm font-medium text-foreground">{label}</p>
-      <p className="text-xs text-muted-foreground truncate">{value}</p>
-    </div>
-    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-primary gap-1" onClick={() => {
-      // In production with real file storage, this would open/download the file
-      alert(`Visualizando: ${value}\n\n(Em produção, o arquivo seria aberto/baixado via Lovable Cloud Storage)`);
-    }}>
-      <Eye className="h-3 w-3" /> Ver
-    </Button>
   </div>
 );
 
