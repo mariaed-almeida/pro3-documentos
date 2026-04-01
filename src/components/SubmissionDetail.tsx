@@ -1,4 +1,4 @@
-import { ArrowLeft, FileText, CheckCircle2, Clock, AlertCircle, Eye, User, Mail, Phone } from "lucide-react";
+import { ArrowLeft, FileText, CheckCircle2, Clock, AlertCircle, Eye, User, Mail, Phone, Download, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Submission, StatusDocumento } from "@/lib/types";
@@ -49,7 +49,6 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
       </header>
 
       <div className="max-w-4xl mx-auto px-6 py-6 space-y-6 animate-fade-in">
-        {/* Breadcrumb path */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span>{submission.cliente}</span>
           <span>/</span>
@@ -58,7 +57,6 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
           <span className="text-foreground font-medium">PI {submission.numeroPi}</span>
         </div>
 
-        {/* Info Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-card rounded-lg border p-5 space-y-3">
             <h3 className="text-sm font-semibold text-foreground">Informações do PI</h3>
@@ -66,6 +64,7 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
             <InfoRow label="Campanha" value={submission.campanha} />
             <InfoRow label="Nº do PI" value={submission.numeroPi} />
             <InfoRow label="Veículo" value={submission.nomeVeiculo} />
+            <InfoRow label="Cidade" value={submission.cidade || "—"} />
             <InfoRow label="Tipo" value={submission.tipoVeiculo === "Outro" ? submission.outroTipo || "Outro" : submission.tipoVeiculo} />
             <InfoRow label="Enviado em" value={new Date(submission.dataEnvio).toLocaleString("pt-BR")} />
           </div>
@@ -84,6 +83,12 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
               <Phone className="h-4 w-4 text-muted-foreground" />
               <span className="text-foreground">{submission.contatoTelefone}</span>
             </div>
+            {submission.cidade && (
+              <div className="flex items-center gap-2 text-sm">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <span className="text-foreground">{submission.cidade}</span>
+              </div>
+            )}
             {submission.observacoes && (
               <div className="pt-2 border-t">
                 <p className="text-xs text-muted-foreground">Observações:</p>
@@ -93,7 +98,7 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
           </div>
         </div>
 
-        {/* Documents */}
+        {/* Documents with view capability */}
         <div className="bg-card rounded-lg border p-5 space-y-4">
           <h3 className="text-sm font-semibold text-foreground">Documentos Anexados</h3>
           <div className="space-y-2">
@@ -108,6 +113,9 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
               return <DocRow key={key} label={label} value={val as string} />;
             })}
           </div>
+          {Object.values(submission.documentos).every(v => !v || (Array.isArray(v) && v.length === 0)) && (
+            <p className="text-sm text-muted-foreground text-center py-4">Nenhum documento anexado.</p>
+          )}
         </div>
 
         {/* Status Actions */}
@@ -123,7 +131,6 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
                   key={st}
                   variant={isActive ? "default" : "outline"}
                   size="sm"
-                  className={isActive ? "" : ""}
                   onClick={() => onStatusUpdate(submission.id, st)}
                   disabled={isActive}
                 >
@@ -147,13 +154,18 @@ const InfoRow = ({ label, value }: { label: string; value: string }) => (
 );
 
 const DocRow = ({ label, value }: { label: string; value: string }) => (
-  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
     <FileText className="h-4 w-4 text-primary shrink-0" />
     <div className="flex-1 min-w-0">
       <p className="text-sm font-medium text-foreground">{label}</p>
       <p className="text-xs text-muted-foreground truncate">{value}</p>
     </div>
-    <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
+    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-primary gap-1" onClick={() => {
+      // In production with real file storage, this would open/download the file
+      alert(`Visualizando: ${value}\n\n(Em produção, o arquivo seria aberto/baixado via Lovable Cloud Storage)`);
+    }}>
+      <Eye className="h-3 w-3" /> Ver
+    </Button>
   </div>
 );
 

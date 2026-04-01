@@ -18,6 +18,7 @@ export interface Submission {
   tipoVeiculo: TipoVeiculo;
   outroTipo?: string;
   nomeVeiculo: string;
+  cidade: string;
   contatoNome: string;
   contatoEmail: string;
   contatoTelefone: string;
@@ -51,3 +52,28 @@ export const CAMPANHAS: Record<Cliente, string[]> = {
     "2026 - Serviços Públicos",
   ],
 };
+
+// Maps doc keys to human-readable type labels for file naming
+export const DOC_TYPE_LABELS: Record<string, string> = {
+  piAssinado: "PI Assinado",
+  declaracaoSimplesNacional: "Declaracao Simples Nacional",
+  comprovantesExibicao: "Comprovantes de Exibicao",
+  declaracaoArtigo299: "Declaracao Artigo 299",
+  tabelaPrecoAssinada: "Tabela de Preco",
+  certidao1: "CND Federal",
+  certidao2: "CND Estadual",
+  certidao3: "CND Municipal",
+  certidao4: "CND FGTS",
+  certidao5: "CND Trabalhista",
+};
+
+export function formatFileName(
+  numeroPi: string,
+  nomeVeiculo: string,
+  cidade: string,
+  docTypeKey: string,
+  originalExtension: string
+): string {
+  const tipoLabel = DOC_TYPE_LABELS[docTypeKey] || docTypeKey;
+  return `PI ${numeroPi} - ${nomeVeiculo} - ${cidade} - ${tipoLabel}${originalExtension}`;
+}
