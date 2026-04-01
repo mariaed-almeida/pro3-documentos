@@ -14,7 +14,101 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      documents: {
+        Row: {
+          created_at: string
+          doc_label: string
+          doc_type: string
+          file_name: string
+          id: string
+          storage_path: string
+          submission_id: string
+        }
+        Insert: {
+          created_at?: string
+          doc_label: string
+          doc_type: string
+          file_name: string
+          id?: string
+          storage_path: string
+          submission_id: string
+        }
+        Update: {
+          created_at?: string
+          doc_label?: string
+          doc_type?: string
+          file_name?: string
+          id?: string
+          storage_path?: string
+          submission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      submissions: {
+        Row: {
+          campanha: string
+          cidade: string
+          cliente: string
+          contato_email: string
+          contato_nome: string
+          contato_telefone: string
+          created_at: string
+          data_envio: string
+          id: string
+          nome_veiculo: string
+          numero_pi: string
+          observacoes: string | null
+          outro_tipo: string | null
+          status: string
+          tipo_veiculo: string
+          updated_at: string
+        }
+        Insert: {
+          campanha: string
+          cidade?: string
+          cliente: string
+          contato_email: string
+          contato_nome: string
+          contato_telefone: string
+          created_at?: string
+          data_envio?: string
+          id?: string
+          nome_veiculo: string
+          numero_pi: string
+          observacoes?: string | null
+          outro_tipo?: string | null
+          status?: string
+          tipo_veiculo: string
+          updated_at?: string
+        }
+        Update: {
+          campanha?: string
+          cidade?: string
+          cliente?: string
+          contato_email?: string
+          contato_nome?: string
+          contato_telefone?: string
+          created_at?: string
+          data_envio?: string
+          id?: string
+          nome_veiculo?: string
+          numero_pi?: string
+          observacoes?: string | null
+          outro_tipo?: string | null
+          status?: string
+          tipo_veiculo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
