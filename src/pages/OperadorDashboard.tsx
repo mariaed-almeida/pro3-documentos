@@ -1,14 +1,14 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Search, FolderOpen, FileText, ChevronRight,
-  CheckCircle2, Clock, AlertCircle, Eye, Folder, LayoutGrid, List, LogOut,
+  CheckCircle2, Clock, AlertCircle, Eye, Folder, LayoutGrid, List, LogOut, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getSubmissions, updateSubmissionStatus } from "@/lib/store";
+import { getSubmissions, updateSubmissionStatus, getSubmissionWithDocs } from "@/lib/store";
 import { Submission, StatusDocumento } from "@/lib/types";
 import SubmissionDetail from "@/components/SubmissionDetail";
 
@@ -24,12 +24,11 @@ const OperadorDashboard = () => {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("todos");
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [viewMode, setViewMode] = useState<"cards" | "tree">("cards");
-
-  // Card navigation state
   const [selectedCliente, setSelectedCliente] = useState<string | null>(null);
   const [selectedCampanha, setSelectedCampanha] = useState<string | null>(null);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!sessionStorage.getItem("pro3_operator_auth")) {
@@ -37,7 +36,14 @@ const OperadorDashboard = () => {
     }
   }, [navigate]);
 
-  const submissions = useMemo(() => getSubmissions(), [refreshKey]);
+  const loadSubmissions = async () => {
+    setLoading(true);
+    const data = await getSubmissions();
+    setSubmissions(data);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadSubmissions(); }, []);
 
   const filtered = useMemo(() => {
     return submissions.filter((s) => {
@@ -60,12 +66,18 @@ const OperadorDashboard = () => {
     return map;
   }, [filtered]);
 
-  const handleStatusUpdate = (id: string, status: StatusDocumento) => {
-    updateSubmissionStatus(id, status);
-    setRefreshKey((k) => k + 1);
+  const handleStatusUpdate = async (id: string, status: StatusDocumento) => {
+    await updateSubmissionStatus(id, status);
+    await loadSubmissions();
     if (selectedSubmission?.id === id) {
       setSelectedSubmission({ ...selectedSubmission, status });
     }
+  };
+
+  const handleSelectSubmission = async (s: Submission) => {
+    const full = await getSubmissionWithDocs(s.id);
+    if (full) setSelectedSubmission(full);
+    else setSelectedSubmission(s);
   };
 
   const handleLogout = () => {
@@ -77,16 +89,11 @@ const OperadorDashboard = () => {
     return (
       <SubmissionDetail
         submission={selectedSubmission}
-        onBack={() => { setSelectedSubmission(null); setRefreshKey((k) => k + 1); }}
+        onBack={() => { setSelectedSubmission(null); loadSubmissions(); }}
         onStatusUpdate={handleStatusUpdate}
       />
     );
   }
-
-  // Card view: drill-down breadcrumb
-  const breadcrumb = [];
-  if (selectedCliente) breadcrumb.push(selectedCliente);
-  if (selectedCampanha) breadcrumb.push(selectedCampanha);
 
   return (
     <div className="min-h-screen bg-background">
@@ -104,20 +111,12 @@ const OperadorDashboard = () => {
             <p className="text-sm text-muted-foreground">Gestão de documentação recebida</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant={viewMode === "cards" ? "default" : "outline"}
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => { setViewMode("cards"); setSelectedCliente(null); setSelectedCampanha(null); }}
-            >
+            <Button variant={viewMode === "cards" ? "default" : "outline"} size="icon" className="h-8 w-8"
+              onClick={() => { setViewMode("cards"); setSelectedCliente(null); setSelectedCampanha(null); }}>
               <LayoutGrid className="h-4 w-4" />
             </Button>
-            <Button
-              variant={viewMode === "tree" ? "default" : "outline"}
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setViewMode("tree")}
-            >
+            <Button variant={viewMode === "tree" ? "default" : "outline"} size="icon" className="h-8 w-8"
+              onClick={() => setViewMode("tree")}>
               <List className="h-4 w-4" />
             </Button>
           </div>
@@ -131,7 +130,6 @@ const OperadorDashboard = () => {
       </header>
 
       <div className="max-w-6xl mx-auto px-6 py-6 space-y-6">
-        {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {(["pendente", "em_analise", "corrigido", "rejeitado"] as StatusDocumento[]).map((st) => {
             const cfg = statusConfig[st];
@@ -149,7 +147,6 @@ const OperadorDashboard = () => {
           })}
         </div>
 
-        {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -167,18 +164,13 @@ const OperadorDashboard = () => {
           </Select>
         </div>
 
-        {/* Breadcrumb for card view */}
-        {viewMode === "cards" && breadcrumb.length > 0 && (
+        {viewMode === "cards" && (selectedCliente || selectedCampanha) && (
           <div className="flex items-center gap-2 text-sm">
-            <button onClick={() => { setSelectedCliente(null); setSelectedCampanha(null); }} className="text-primary hover:underline">
-              Clientes
-            </button>
+            <button onClick={() => { setSelectedCliente(null); setSelectedCampanha(null); }} className="text-primary hover:underline">Clientes</button>
             {selectedCliente && (
               <>
                 <ChevronRight className="h-3 w-3 text-muted-foreground" />
-                <button onClick={() => setSelectedCampanha(null)} className={selectedCampanha ? "text-primary hover:underline" : "text-foreground font-medium"}>
-                  {selectedCliente}
-                </button>
+                <button onClick={() => setSelectedCampanha(null)} className={selectedCampanha ? "text-primary hover:underline" : "text-foreground font-medium"}>{selectedCliente}</button>
               </>
             )}
             {selectedCampanha && (
@@ -190,7 +182,12 @@ const OperadorDashboard = () => {
           </div>
         )}
 
-        {Object.keys(grouped).length === 0 ? (
+        {loading ? (
+          <div className="bg-card rounded-lg border p-12 text-center">
+            <Loader2 className="h-8 w-8 text-primary mx-auto mb-4 animate-spin" />
+            <p className="text-sm text-muted-foreground">Carregando documentação...</p>
+          </div>
+        ) : Object.keys(grouped).length === 0 ? (
           <div className="bg-card rounded-lg border p-12 text-center">
             <FolderOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-foreground mb-1">Nenhuma documentação encontrada</h3>
@@ -199,26 +196,14 @@ const OperadorDashboard = () => {
             </p>
           </div>
         ) : viewMode === "cards" ? (
-          <CardView
-            grouped={grouped}
-            selectedCliente={selectedCliente}
-            selectedCampanha={selectedCampanha}
-            onSelectCliente={setSelectedCliente}
-            onSelectCampanha={setSelectedCampanha}
-            onSelectSubmission={setSelectedSubmission}
-            onStatusUpdate={handleStatusUpdate}
-            statusConfig={statusConfig}
-          />
+          <CardView grouped={grouped} selectedCliente={selectedCliente} selectedCampanha={selectedCampanha}
+            onSelectCliente={setSelectedCliente} onSelectCampanha={setSelectedCampanha}
+            onSelectSubmission={handleSelectSubmission} onStatusUpdate={handleStatusUpdate} statusConfig={statusConfig} />
         ) : (
           <div className="space-y-4">
             {Object.entries(grouped).map(([cliente, campanhas]) => (
-              <TreeClienteFolder
-                key={cliente}
-                cliente={cliente}
-                campanhas={campanhas}
-                onSelect={setSelectedSubmission}
-                statusConfig={statusConfig}
-              />
+              <TreeClienteFolder key={cliente} cliente={cliente} campanhas={campanhas}
+                onSelect={handleSelectSubmission} statusConfig={statusConfig} />
             ))}
           </div>
         )}
@@ -242,7 +227,6 @@ const CardView = ({
   onStatusUpdate: (id: string, status: StatusDocumento) => void;
   statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock; className: string }>;
 }) => {
-  // Level 1: Clientes
   if (!selectedCliente) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -258,9 +242,7 @@ const CardView = ({
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-foreground text-lg">{cliente}</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {Object.keys(campanhas).length} campanha{Object.keys(campanhas).length !== 1 ? "s" : ""} • {total} PI{total !== 1 ? "s" : ""}
-                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">{Object.keys(campanhas).length} campanha(s) • {total} PI(s)</p>
                   {pendentes > 0 && (
                     <Badge variant="outline" className="mt-2 bg-warning/10 text-warning border-warning/20 text-xs">
                       {pendentes} pendente{pendentes !== 1 ? "s" : ""}
@@ -276,7 +258,6 @@ const CardView = ({
     );
   }
 
-  // Level 2: Campanhas
   if (!selectedCampanha) {
     const campanhas = grouped[selectedCliente] || {};
     return (
@@ -293,18 +274,10 @@ const CardView = ({
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-foreground">{campanha}</h3>
-                  <p className="text-sm text-muted-foreground mt-1">{subs.length} PI{subs.length !== 1 ? "s" : ""}</p>
+                  <p className="text-sm text-muted-foreground mt-1">{subs.length} PI(s)</p>
                   <div className="flex gap-2 mt-2">
-                    {corrigidos > 0 && (
-                      <Badge variant="outline" className="bg-success/10 text-success border-success/20 text-xs">
-                        <CheckCircle2 className="h-3 w-3 mr-1" />{corrigidos}
-                      </Badge>
-                    )}
-                    {pendentes > 0 && (
-                      <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20 text-xs">
-                        <Clock className="h-3 w-3 mr-1" />{pendentes}
-                      </Badge>
-                    )}
+                    {corrigidos > 0 && <Badge variant="outline" className="bg-success/10 text-success border-success/20 text-xs"><CheckCircle2 className="h-3 w-3 mr-1" />{corrigidos}</Badge>}
+                    {pendentes > 0 && <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20 text-xs"><Clock className="h-3 w-3 mr-1" />{pendentes}</Badge>}
                   </div>
                 </div>
                 <ChevronRight className="h-5 w-5 text-muted-foreground mt-1" />
@@ -316,16 +289,12 @@ const CardView = ({
     );
   }
 
-  // Level 3: PIs
   const subs = grouped[selectedCliente]?.[selectedCampanha] || [];
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {subs.map((s) => {
         const cfg = statusConfig[s.status];
         const Icon = cfg.icon;
-        const docCount = Object.entries(s.documentos).filter(([, v]) =>
-          v && (Array.isArray(v) ? v.length > 0 : true)
-        ).length;
         return (
           <button key={s.id} onClick={() => onSelectSubmission(s)}
             className="bg-card rounded-xl border p-5 hover:shadow-lg hover:border-primary/30 transition-all text-left group">
@@ -345,7 +314,7 @@ const CardView = ({
             </div>
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>{s.tipoVeiculo} • {s.cidade || "—"}</span>
-              <span>{docCount} doc{docCount !== 1 ? "s" : ""} • {new Date(s.dataEnvio).toLocaleDateString("pt-BR")}</span>
+              <span>{new Date(s.dataEnvio).toLocaleDateString("pt-BR")}</span>
             </div>
             {s.status === "pendente" && (
               <div className="flex gap-2 mt-3 pt-3 border-t">
@@ -366,13 +335,10 @@ const CardView = ({
   );
 };
 
-/* ============ TREE VIEW (original) ============ */
+/* ============ TREE VIEW ============ */
 
-const TreeClienteFolder = ({
-  cliente, campanhas, onSelect, statusConfig,
-}: {
-  cliente: string;
-  campanhas: Record<string, Submission[]>;
+const TreeClienteFolder = ({ cliente, campanhas, onSelect, statusConfig }: {
+  cliente: string; campanhas: Record<string, Submission[]>;
   onSelect: (s: Submission) => void;
   statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock; className: string }>;
 }) => {
@@ -383,9 +349,7 @@ const TreeClienteFolder = ({
         <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`} />
         <Folder className="h-5 w-5 text-primary" />
         <span className="font-semibold text-foreground">{cliente}</span>
-        <span className="text-xs text-muted-foreground ml-auto">
-          {Object.values(campanhas).flat().length} PI(s)
-        </span>
+        <span className="text-xs text-muted-foreground ml-auto">{Object.values(campanhas).flat().length} PI(s)</span>
       </button>
       {open && (
         <div className="border-t">
@@ -398,11 +362,8 @@ const TreeClienteFolder = ({
   );
 };
 
-const TreeCampanhaFolder = ({
-  campanha, submissions, onSelect, statusConfig,
-}: {
-  campanha: string;
-  submissions: Submission[];
+const TreeCampanhaFolder = ({ campanha, submissions, onSelect, statusConfig }: {
+  campanha: string; submissions: Submission[];
   onSelect: (s: Submission) => void;
   statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock; className: string }>;
 }) => {

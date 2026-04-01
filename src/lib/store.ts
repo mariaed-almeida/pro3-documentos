@@ -14,7 +14,7 @@ export async function getSubmissions(): Promise<Submission[]> {
     return [];
   }
 
-  return (data || []).map(mapDbToSubmission);
+  return (data || []).map((sub) => mapDbToSubmission(sub));
 }
 
 export async function getSubmissionWithDocs(id: string): Promise<Submission | null> {
