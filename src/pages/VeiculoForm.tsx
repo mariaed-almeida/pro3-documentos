@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Cliente, TipoVeiculo, CAMPANHAS, Submission } from "@/lib/types";
+import { Cliente, TipoVeiculo, CAMPANHAS, Submission, formatFileName } from "@/lib/types";
 import { addSubmission, storeFileReference } from "@/lib/store";
 import SubmissionReceipt from "@/components/SubmissionReceipt";
 
@@ -26,19 +26,18 @@ const VeiculoForm = () => {
   const [showReceipt, setShowReceipt] = useState(false);
   const [submittedData, setSubmittedData] = useState<Submission | null>(null);
 
-  // Form state
   const [cliente, setCliente] = useState<Cliente | "">("");
   const [campanha, setCampanha] = useState("");
   const [numeroPi, setNumeroPi] = useState("");
   const [tipoVeiculo, setTipoVeiculo] = useState<TipoVeiculo | "">("");
   const [outroTipo, setOutroTipo] = useState("");
   const [nomeVeiculo, setNomeVeiculo] = useState("");
+  const [cidade, setCidade] = useState("");
   const [contatoNome, setContatoNome] = useState("");
   const [contatoEmail, setContatoEmail] = useState("");
   const [contatoTelefone, setContatoTelefone] = useState("");
   const [observacoes, setObservacoes] = useState("");
 
-  // Document files
   const [docs, setDocs] = useState<Record<string, DocFile>>({
     piAssinado: { file: null, name: "" },
     declaracaoSimplesNacional: { file: null, name: "" },
@@ -61,8 +60,19 @@ const VeiculoForm = () => {
 
   const campanhasDisponiveis = cliente ? CAMPANHAS[cliente] : [];
 
+  const getFileExtension = (filename: string) => {
+    const idx = filename.lastIndexOf(".");
+    return idx !== -1 ? filename.substring(idx) : "";
+  };
+
+  const buildStandardizedName = (key: string, originalName: string) => {
+    if (!originalName) return "";
+    const ext = getFileExtension(originalName);
+    return formatFileName(numeroPi, nomeVeiculo, cidade, key, ext);
+  };
+
   const validateStep1 = () => {
-    if (!cliente || !campanha || !numeroPi || !tipoVeiculo || !nomeVeiculo) {
+    if (!cliente || !campanha || !numeroPi || !tipoVeiculo || !nomeVeiculo || !cidade) {
       toast({ title: "Campos obrigatórios", description: "Preencha todos os campos antes de continuar.", variant: "destructive" });
       return false;
     }
@@ -82,13 +92,19 @@ const VeiculoForm = () => {
   };
 
   const handleSubmit = () => {
-    // Check required documents
     if (!docs.piAssinado.file) {
       toast({ title: "Documento obrigatório", description: "O PI Assinado é obrigatório.", variant: "destructive" });
       return;
     }
 
     const id = crypto.randomUUID();
+
+    // Build standardized file names
+    const stdName = (key: string) => {
+      const d = docs[key];
+      return d?.file ? buildStandardizedName(key, d.name) : undefined;
+    };
+
     const submission: Submission = {
       id,
       cliente: cliente as Cliente,
@@ -97,19 +113,20 @@ const VeiculoForm = () => {
       tipoVeiculo: tipoVeiculo as TipoVeiculo,
       outroTipo: tipoVeiculo === "Outro" ? outroTipo : undefined,
       nomeVeiculo,
+      cidade,
       contatoNome,
       contatoEmail,
       contatoTelefone,
       documentos: {
-        piAssinado: docs.piAssinado.name,
-        declaracaoSimplesNacional: docs.declaracaoSimplesNacional.name || undefined,
-        comprovantesExibicao: docs.comprovantesExibicao.name || undefined,
-        declaracaoArtigo299: docs.declaracaoArtigo299.name || undefined,
+        piAssinado: stdName("piAssinado"),
+        declaracaoSimplesNacional: stdName("declaracaoSimplesNacional"),
+        comprovantesExibicao: stdName("comprovantesExibicao"),
+        declaracaoArtigo299: stdName("declaracaoArtigo299"),
         certidoesNegativas: [
-          docs.certidao1.name, docs.certidao2.name, docs.certidao3.name,
-          docs.certidao4.name, docs.certidao5.name,
-        ].filter(Boolean),
-        tabelaPrecoAssinada: docs.tabelaPrecoAssinada.name || undefined,
+          stdName("certidao1"), stdName("certidao2"), stdName("certidao3"),
+          stdName("certidao4"), stdName("certidao5"),
+        ].filter(Boolean) as string[],
+        tabelaPrecoAssinada: stdName("tabelaPrecoAssinada"),
       },
       status: "pendente",
       dataEnvio: new Date().toISOString(),
@@ -118,9 +135,11 @@ const VeiculoForm = () => {
 
     addSubmission(submission);
 
-    // Store file references
     Object.entries(docs).forEach(([key, val]) => {
-      if (val.file) storeFileReference(id, key, val.name);
+      if (val.file) {
+        const standardized = buildStandardizedName(key, val.name);
+        storeFileReference(id, key, standardized);
+      }
     });
 
     setSubmittedData(submission);
@@ -149,7 +168,6 @@ const VeiculoForm = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="bg-card border-b sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
@@ -162,7 +180,6 @@ const VeiculoForm = () => {
         </div>
       </header>
 
-      {/* Progress */}
       <div className="max-w-4xl mx-auto px-6 py-6">
         <div className="flex items-center gap-2 mb-8">
           {[1, 2, 3].map((s) => (
@@ -180,11 +197,9 @@ const VeiculoForm = () => {
           ))}
         </div>
 
-        {/* Step 1: Basic Info */}
         {step === 1 && (
           <div className="bg-card rounded-lg border p-6 animate-fade-in space-y-5">
             <h2 className="text-lg font-semibold text-foreground">Informações do PI</h2>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-2">
                 <Label>Cliente *</Label>
@@ -195,7 +210,6 @@ const VeiculoForm = () => {
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="space-y-2">
                 <Label>Campanha *</Label>
                 <Select value={campanha} onValueChange={setCampanha} disabled={!cliente}>
@@ -205,17 +219,18 @@ const VeiculoForm = () => {
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="space-y-2">
                 <Label>Número do PI *</Label>
                 <Input placeholder="Ex: 5001" value={numeroPi} onChange={(e) => setNumeroPi(e.target.value)} />
               </div>
-
               <div className="space-y-2">
                 <Label>Nome do Veículo *</Label>
                 <Input placeholder="Ex: Portal Sou Catarina" value={nomeVeiculo} onChange={(e) => setNomeVeiculo(e.target.value)} />
               </div>
-
+              <div className="space-y-2">
+                <Label>Cidade *</Label>
+                <Input placeholder="Ex: Xaxim" value={cidade} onChange={(e) => setCidade(e.target.value)} />
+              </div>
               <div className="space-y-2">
                 <Label>Tipo do Veículo *</Label>
                 <Select value={tipoVeiculo} onValueChange={(v) => setTipoVeiculo(v as TipoVeiculo)}>
@@ -225,7 +240,6 @@ const VeiculoForm = () => {
                   </SelectContent>
                 </Select>
               </div>
-
               {tipoVeiculo === "Outro" && (
                 <div className="space-y-2">
                   <Label>Especifique o tipo *</Label>
@@ -233,18 +247,15 @@ const VeiculoForm = () => {
                 </div>
               )}
             </div>
-
             <div className="flex justify-end pt-4">
               <Button onClick={() => validateStep1() && setStep(2)}>Próximo</Button>
             </div>
           </div>
         )}
 
-        {/* Step 2: Contact */}
         {step === 2 && (
           <div className="bg-card rounded-lg border p-6 animate-fade-in space-y-5">
             <h2 className="text-lg font-semibold text-foreground">Dados de Contato</h2>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-2 md:col-span-2">
                 <Label>Nome do responsável *</Label>
@@ -263,7 +274,6 @@ const VeiculoForm = () => {
                 <Textarea placeholder="Informações adicionais..." value={observacoes} onChange={(e) => setObservacoes(e.target.value)} rows={3} />
               </div>
             </div>
-
             <div className="flex justify-between pt-4">
               <Button variant="outline" onClick={() => setStep(1)}>Voltar</Button>
               <Button onClick={() => validateStep2() && setStep(3)}>Próximo</Button>
@@ -271,12 +281,10 @@ const VeiculoForm = () => {
           </div>
         )}
 
-        {/* Step 3: Documents */}
         {step === 3 && (
           <div className="bg-card rounded-lg border p-6 animate-fade-in space-y-6">
             <h2 className="text-lg font-semibold text-foreground">Documentação</h2>
             <p className="text-sm text-muted-foreground">Anexe os documentos necessários. Campos com * são obrigatórios.</p>
-
             <div className="space-y-4">
               {docFields.map(({ key, label, required, desc }) => (
                 <FileUploadField
@@ -288,7 +296,6 @@ const VeiculoForm = () => {
                   onChange={(f) => handleFileChange(key, f)}
                 />
               ))}
-
               <div className="border-t pt-4">
                 <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-warning" />
@@ -307,7 +314,6 @@ const VeiculoForm = () => {
                 </div>
               </div>
             </div>
-
             <div className="flex justify-between pt-4">
               <Button variant="outline" onClick={() => setStep(2)}>Voltar</Button>
               <Button onClick={handleSubmit} className="gap-2">
