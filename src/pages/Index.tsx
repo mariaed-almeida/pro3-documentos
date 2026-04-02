@@ -49,31 +49,6 @@ const Index = () => {
         © 2026 Pro3 Comunicação Ltda. Todos os direitos reservados.
       </p>
 
-      {/* Operator Login Dialog */}
-      <Dialog open={showLogin} onOpenChange={setShowLogin}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Lock className="h-4 w-4" /> Acesso do Operador
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div className="space-y-2">
-              <Label>Senha de acesso</Label>
-              <Input
-                type="password"
-                placeholder="Digite a senha..."
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              />
-            </div>
-            <Button className="w-full gap-2" onClick={handleLogin}>
-              <LogIn className="h-4 w-4" /> Entrar
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
