@@ -1,41 +1,20 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { FileText, Upload, Lock, LogIn } from "lucide-react";
+import { Link } from "react-router-dom";
+import { FileText, Upload, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
 import logoPro3 from "@/assets/logo-pro3.png";
 
-const OPERATOR_PASSWORD = "pro3op2026";
-
 const Index = () => {
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const [showLogin, setShowLogin] = useState(false);
-  const [password, setPassword] = useState("");
-
-  const handleLogin = () => {
-    if (password === OPERATOR_PASSWORD) {
-      sessionStorage.setItem("pro3_operator_auth", "true");
-      navigate("/operador");
-    } else {
-      toast({ title: "Senha incorreta", description: "Verifique a senha e tente novamente.", variant: "destructive" });
-    }
-  };
-
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Top bar with operator access */}
       <div className="flex justify-end px-6 py-3">
-        <button
-          onClick={() => setShowLogin(true)}
+        <Link
+          to="/operador/login"
           className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-md border border-border hover:border-primary/30 bg-card"
         >
           <Lock className="h-3 w-3" />
           Espaço de Operações
-        </button>
+        </Link>
       </div>
 
       {/* Main content */}
