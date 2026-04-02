@@ -30,10 +30,24 @@ const OperadorDashboard = () => {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [authChecked, setAuthChecked] = useState(false);
+
   useEffect(() => {
-    if (!sessionStorage.getItem("pro3_operator_auth")) {
-      navigate("/");
-    }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session) {
+        navigate("/operador/login", { replace: true });
+      }
+      setAuthChecked(true);
+    });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        navigate("/operador/login", { replace: true });
+      }
+      setAuthChecked(true);
+    });
+
+    return () => subscription.unsubscribe();
   }, [navigate]);
 
   const loadSubmissions = async () => {
