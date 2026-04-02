@@ -3,7 +3,7 @@ import { ArrowLeft, FileText, CheckCircle2, Clock, AlertCircle, Eye, User, Mail,
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Submission, StatusDocumento } from "@/lib/types";
-import { getDocumentUrl } from "@/lib/store";
+import { supabase } from "@/integrations/supabase/client";
 import { supabase } from "@/integrations/supabase/client";
 
 const statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock; className: string }> = {
