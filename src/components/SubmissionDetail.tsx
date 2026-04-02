@@ -19,6 +19,7 @@ interface DbDocument {
   doc_label: string;
   file_name: string;
   storage_path: string;
+  signed_url?: string;
 }
 
 interface Props {
