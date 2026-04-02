@@ -39,7 +39,18 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
         .from("documents")
         .select("*")
         .eq("submission_id", submission.id);
-      if (data) setDocuments(data);
+      if (data) {
+        // Generate signed URLs for each document
+        const docsWithUrls = await Promise.all(
+          data.map(async (doc) => {
+            const { data: urlData } = await supabase.storage
+              .from("documentos")
+              .createSignedUrl(doc.storage_path, 3600);
+            return { ...doc, signed_url: urlData?.signedUrl || "" };
+          })
+        );
+        setDocuments(docsWithUrls);
+      }
     };
     load();
   }, [submission.id]);
