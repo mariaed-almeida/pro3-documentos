@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getSubmissions, updateSubmissionStatus, getSubmissionWithDocs } from "@/lib/store";
 import { Submission, StatusDocumento } from "@/lib/types";
 import SubmissionDetail from "@/components/SubmissionDetail";
+import { supabase } from "@/integrations/supabase/client";
 
 const statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock; className: string }> = {
   pendente: { label: "Pendente", icon: Clock, className: "bg-warning/10 text-warning border-warning/20" },
