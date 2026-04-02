@@ -4,17 +4,19 @@ import { Button } from "@/components/ui/button";
 import logoPro3 from "@/assets/logo-pro3.png";
 
 const Index = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Top bar with operator access */}
       <div className="flex justify-end px-6 py-3">
-        <Link
-          to="/operador/login"
-          className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-md border border-border hover:border-primary/30 bg-card"
+        <button
+          onClick={() => navigate("/operador/login")}
+          className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-md border border-border hover:border-primary/30 bg-card cursor-pointer"
         >
           <Lock className="h-3 w-3" />
           Espaço de Operações
-        </Link>
+        </button>
       </div>
 
       {/* Main content */}
