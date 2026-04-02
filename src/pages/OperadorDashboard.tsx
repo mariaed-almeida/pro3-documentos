@@ -94,8 +94,8 @@ const OperadorDashboard = () => {
     else setSelectedSubmission(s);
   };
 
-  const handleLogout = () => {
-    sessionStorage.removeItem("pro3_operator_auth");
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     navigate("/");
   };
 
