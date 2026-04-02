@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getSubmissions, updateSubmissionStatus, getSubmissionWithDocs } from "@/lib/store";
 import { Submission, StatusDocumento } from "@/lib/types";
 import SubmissionDetail from "@/components/SubmissionDetail";
+import { supabase } from "@/integrations/supabase/client";
 
 const statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock; className: string }> = {
   pendente: { label: "Pendente", icon: Clock, className: "bg-warning/10 text-warning border-warning/20" },
@@ -30,10 +31,24 @@ const OperadorDashboard = () => {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [authChecked, setAuthChecked] = useState(false);
+
   useEffect(() => {
-    if (!sessionStorage.getItem("pro3_operator_auth")) {
-      navigate("/");
-    }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session) {
+        navigate("/operador/login", { replace: true });
+      }
+      setAuthChecked(true);
+    });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        navigate("/operador/login", { replace: true });
+      }
+      setAuthChecked(true);
+    });
+
+    return () => subscription.unsubscribe();
   }, [navigate]);
 
   const loadSubmissions = async () => {
@@ -80,8 +95,8 @@ const OperadorDashboard = () => {
     else setSelectedSubmission(s);
   };
 
-  const handleLogout = () => {
-    sessionStorage.removeItem("pro3_operator_auth");
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     navigate("/");
   };
 

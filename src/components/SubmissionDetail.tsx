@@ -3,7 +3,6 @@ import { ArrowLeft, FileText, CheckCircle2, Clock, AlertCircle, Eye, User, Mail,
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Submission, StatusDocumento } from "@/lib/types";
-import { getDocumentUrl } from "@/lib/store";
 import { supabase } from "@/integrations/supabase/client";
 
 const statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock; className: string }> = {
@@ -19,6 +18,7 @@ interface DbDocument {
   doc_label: string;
   file_name: string;
   storage_path: string;
+  signed_url?: string;
 }
 
 interface Props {
@@ -38,7 +38,18 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
         .from("documents")
         .select("*")
         .eq("submission_id", submission.id);
-      if (data) setDocuments(data);
+      if (data) {
+        // Generate signed URLs for each document
+        const docsWithUrls = await Promise.all(
+          data.map(async (doc) => {
+            const { data: urlData } = await supabase.storage
+              .from("documentos")
+              .createSignedUrl(doc.storage_path, 3600);
+            return { ...doc, signed_url: urlData?.signedUrl || "" };
+          })
+        );
+        setDocuments(docsWithUrls);
+      }
     };
     load();
   }, [submission.id]);
@@ -112,12 +123,12 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
                     <p className="text-xs text-muted-foreground truncate">{doc.file_name}</p>
                   </div>
                   <a
-                    href={getDocumentUrl(doc.storage_path)}
+                    href={doc.signed_url || "#"}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="shrink-0"
                   >
-                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-primary gap-1">
+                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-primary gap-1" disabled={!doc.signed_url}>
                       <ExternalLink className="h-3 w-3" /> Abrir
                     </Button>
                   </a>

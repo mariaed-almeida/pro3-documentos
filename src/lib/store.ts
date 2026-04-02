@@ -115,9 +115,15 @@ export async function updateSubmissionStatus(id: string, status: StatusDocumento
   if (error) console.error("Error updating status:", error);
 }
 
-export function getDocumentUrl(storagePath: string): string {
-  const { data } = supabase.storage.from("documentos").getPublicUrl(storagePath);
-  return data.publicUrl;
+export async function getDocumentUrl(storagePath: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from("documentos")
+    .createSignedUrl(storagePath, 3600); // 1 hour
+  if (error || !data?.signedUrl) {
+    console.error("Error creating signed URL:", error);
+    return "";
+  }
+  return data.signedUrl;
 }
 
 // ===== MAPPERS =====
