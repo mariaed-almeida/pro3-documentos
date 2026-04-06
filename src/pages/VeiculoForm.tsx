@@ -277,8 +277,9 @@ const VeiculoForm = () => {
               <div className="border-t pt-4">
                 <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-warning" />
-                  Certidões Negativas (5 obrigatórias)
+                  Certidões Negativas
                 </h3>
+                <p className="text-xs text-muted-foreground mb-3">{certidaoAviso}</p>
                 <div className="space-y-3">
                   {certidaoLabels.map((label, i) => (
                     <FileUploadField key={`certidao${i + 1}`} label={label} required={false} file={docs[`certidao${i + 1}`]?.file} onChange={(f) => handleFileChange(`certidao${i + 1}`, f)} />
