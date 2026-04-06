@@ -130,20 +130,25 @@ const VeiculoForm = () => {
   }
 
   const docFields = [
-    { key: "piAssinado", label: "PI Assinado", required: true, desc: "Pedido de Inserção devidamente assinado" },
-    { key: "declaracaoSimplesNacional", label: "Declaração Simples Nacional", required: false, desc: "Documento comprovatório de dispensa de retenção do IRRF" },
+    ...(cliente !== "ALESC" ? [{ key: "piAssinado", label: "PI Assinado", required: true, desc: "Pedido de Inserção devidamente assinado" }] : []),
+    { key: "notaFiscal", label: "Nota Fiscal", required: false, desc: "Nota Fiscal referente ao serviço prestado" },
+    { key: "declaracaoSimplesNacional", label: "Declaração como Optante pelo Simples Nacional", required: false, desc: "Documento comprovatório de dispensa de retenção do IRRF (Caso não seja Optante, não inclua nenhum documento)" },
     { key: "comprovantesExibicao", label: "Comprovantes de Exibição", required: false, desc: "Comprovantes de veiculação da campanha" },
     { key: "declaracaoArtigo299", label: "Declaração do Artigo 299", required: false, desc: "Declaração conforme Art. 299 do Código Penal" },
     { key: "tabelaPrecoAssinada", label: "Tabela de Preço Assinada", required: false, desc: "Tabela de preços do veículo assinada" },
   ];
 
   const certidaoLabels = [
-    "Certidão Negativa Federal (RFB/PGFN)",
-    "Certidão Negativa Estadual",
-    "Certidão Negativa Municipal",
-    "Certidão Negativa FGTS",
-    "Certidão Negativa Trabalhista (CNDT)",
+    "Certidão Negativa de Débitos Municipais",
+    "Certidão Negativa de Débitos Estaduais",
+    "Certidão Negativa de Débitos Relativos aos Tributos Federais",
+    "Certificado de Regularidade do FGTS - CRF",
+    "Certidão Negativa de Débitos Trabalhistas",
   ];
+
+  const certidaoAviso = cliente === "ALESC"
+    ? "As certidões devem ter pelo menos 15 dias de validade na data do envio da documentação."
+    : "As certidões devem estar válidas no dia da emissão da Nota Fiscal.";
 
   return (
     <div className="min-h-screen bg-background">
