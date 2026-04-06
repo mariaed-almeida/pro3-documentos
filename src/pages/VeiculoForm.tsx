@@ -42,6 +42,7 @@ const VeiculoForm = () => {
 
   const [docs, setDocs] = useState<Record<string, DocFile>>({
     piAssinado: { file: null, name: "" },
+    notaFiscal: { file: null, name: "" },
     declaracaoSimplesNacional: { file: null, name: "" },
     comprovantesExibicao: { file: null, name: "" },
     declaracaoArtigo299: { file: null, name: "" },
