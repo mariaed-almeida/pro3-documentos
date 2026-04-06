@@ -56,15 +56,16 @@ export const CAMPANHAS: Record<Cliente, string[]> = {
 // Maps doc keys to human-readable type labels for file naming
 export const DOC_TYPE_LABELS: Record<string, string> = {
   piAssinado: "PI Assinado",
+  notaFiscal: "Nota Fiscal",
   declaracaoSimplesNacional: "Declaracao Simples Nacional",
   comprovantesExibicao: "Comprovantes de Exibicao",
   declaracaoArtigo299: "Declaracao Artigo 299",
   tabelaPrecoAssinada: "Tabela de Preco",
-  certidao1: "CND Federal",
-  certidao2: "CND Estadual",
-  certidao3: "CND Municipal",
-  certidao4: "CND FGTS",
-  certidao5: "CND Trabalhista",
+  certidao1: "CND Debitos Municipais",
+  certidao2: "CND Debitos Estaduais",
+  certidao3: "CND Tributos Federais",
+  certidao4: "CRF FGTS",
+  certidao5: "CND Debitos Trabalhistas",
 };
 
 export function formatFileName(
