@@ -81,7 +81,7 @@ const VeiculoForm = () => {
   };
 
   const handleSubmit = async () => {
-    if (!docs.piAssinado.file) {
+    if (cliente !== "ALESC" && !docs.piAssinado.file) {
       toast({ title: "Documento obrigatório", description: "O PI Assinado é obrigatório.", variant: "destructive" });
       return;
     }
