@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Upload, CheckCircle2, FileText, AlertCircle } from "lucide-react";
+import { ArrowLeft, Upload, CheckCircle2, FileText, AlertCircle, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,11 +14,6 @@ import { Submission } from "@/lib/types";
 
 const CLIENTES: Cliente[] = ["ALESC", "Prefeitura de Xanxerê", "Prefeitura de Chapecó"];
 const TIPOS_VEICULO: TipoVeiculo[] = ["Jornal", "Rádio", "Televisão", "Portal", "Mídia Externa", "Outro"];
-
-interface DocFile {
-  file: File | null;
-  name: string;
-}
 
 const VeiculoForm = () => {
   const navigate = useNavigate();
@@ -40,22 +35,30 @@ const VeiculoForm = () => {
   const [contatoTelefone, setContatoTelefone] = useState("");
   const [observacoes, setObservacoes] = useState("");
 
-  const [docs, setDocs] = useState<Record<string, DocFile>>({
-    piAssinado: { file: null, name: "" },
-    notaFiscal: { file: null, name: "" },
-    declaracaoSimplesNacional: { file: null, name: "" },
-    comprovantesExibicao: { file: null, name: "" },
-    declaracaoArtigo299: { file: null, name: "" },
-    certidao1: { file: null, name: "" },
-    certidao2: { file: null, name: "" },
-    certidao3: { file: null, name: "" },
-    certidao4: { file: null, name: "" },
-    certidao5: { file: null, name: "" },
-    tabelaPrecoAssinada: { file: null, name: "" },
+  // Multi-file support: each doc key maps to an array of files
+  const [docs, setDocs] = useState<Record<string, File[]>>({
+    piAssinado: [],
+    notaFiscal: [],
+    declaracaoSimplesNacional: [],
+    comprovantesExibicao: [],
+    declaracaoArtigo299: [],
+    certidao1: [],
+    certidao2: [],
+    certidao3: [],
+    certidao4: [],
+    certidao5: [],
+    tabelaPrecoAssinada: [],
   });
 
-  const handleFileChange = (key: string, file: File | null) => {
-    setDocs((prev) => ({ ...prev, [key]: { file, name: file?.name || "" } }));
+  const handleAddFile = (key: string, file: File) => {
+    setDocs((prev) => ({ ...prev, [key]: [...(prev[key] || []), file] }));
+  };
+
+  const handleRemoveFile = (key: string, index: number) => {
+    setDocs((prev) => ({
+      ...prev,
+      [key]: prev[key].filter((_, i) => i !== index),
+    }));
   };
 
   const campanhasDisponiveis = cliente ? CAMPANHAS[cliente] : [];
@@ -81,17 +84,23 @@ const VeiculoForm = () => {
   };
 
   const handleSubmit = async () => {
-    if (cliente !== "ALESC" && !docs.piAssinado.file) {
+    if (cliente !== "ALESC" && docs.piAssinado.length === 0) {
       toast({ title: "Documento obrigatório", description: "O PI Assinado é obrigatório.", variant: "destructive" });
       return;
     }
 
     setIsSubmitting(true);
 
-    // Collect files
+    // Flatten multi-file docs into indexed keys for the store
     const files: Record<string, File> = {};
-    Object.entries(docs).forEach(([key, val]) => {
-      if (val.file) files[key] = val.file;
+    Object.entries(docs).forEach(([key, fileList]) => {
+      fileList.forEach((file, index) => {
+        if (fileList.length === 1) {
+          files[key] = file;
+        } else {
+          files[`${key}__${index + 1}`] = file;
+        }
+      });
     });
 
     try {
@@ -269,10 +278,18 @@ const VeiculoForm = () => {
         {step === 3 && (
           <div className="bg-card rounded-lg border p-6 animate-fade-in space-y-6">
             <h2 className="text-lg font-semibold text-foreground">Documentação</h2>
-            <p className="text-sm text-muted-foreground">Anexe os documentos necessários. Campos com * são obrigatórios.</p>
+            <p className="text-sm text-muted-foreground">Anexe os documentos necessários. Campos com * são obrigatórios. Você pode adicionar mais de um arquivo por item.</p>
             <div className="space-y-4">
               {docFields.map(({ key, label, required, desc }) => (
-                <FileUploadField key={key} label={label} description={desc} required={required} file={docs[key]?.file} onChange={(f) => handleFileChange(key, f)} />
+                <MultiFileUploadField
+                  key={key}
+                  label={label}
+                  description={desc}
+                  required={required}
+                  files={docs[key] || []}
+                  onAdd={(f) => handleAddFile(key, f)}
+                  onRemove={(i) => handleRemoveFile(key, i)}
+                />
               ))}
               <div className="border-t pt-4">
                 <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
@@ -282,7 +299,14 @@ const VeiculoForm = () => {
                 <p className="text-xs text-muted-foreground mb-3">{certidaoAviso}</p>
                 <div className="space-y-3">
                   {certidaoLabels.map((label, i) => (
-                    <FileUploadField key={`certidao${i + 1}`} label={label} required={false} file={docs[`certidao${i + 1}`]?.file} onChange={(f) => handleFileChange(`certidao${i + 1}`, f)} />
+                    <MultiFileUploadField
+                      key={`certidao${i + 1}`}
+                      label={label}
+                      required={false}
+                      files={docs[`certidao${i + 1}`] || []}
+                      onAdd={(f) => handleAddFile(`certidao${i + 1}`, f)}
+                      onRemove={(idx) => handleRemoveFile(`certidao${i + 1}`, idx)}
+                    />
                   ))}
                 </div>
               </div>
@@ -300,38 +324,53 @@ const VeiculoForm = () => {
   );
 };
 
-const FileUploadField = ({
-  label, description, required, file, onChange,
+const MultiFileUploadField = ({
+  label, description, required, files, onAdd, onRemove,
 }: {
   label: string;
   description?: string;
   required?: boolean;
-  file: File | null;
-  onChange: (file: File | null) => void;
+  files: File[];
+  onAdd: (file: File) => void;
+  onRemove: (index: number) => void;
 }) => (
-  <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg border border-dashed bg-muted/30 hover:bg-muted/50 transition-colors">
-    <div className="flex-1 min-w-0">
-      <p className="text-sm font-medium text-foreground">
-        {label} {required && <span className="text-destructive">*</span>}
-      </p>
-      {description && <p className="text-xs text-muted-foreground">{description}</p>}
+  <div className="p-3 rounded-lg border border-dashed bg-muted/30 hover:bg-muted/50 transition-colors space-y-2">
+    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-foreground">
+          {label} {required && <span className="text-destructive">*</span>}
+        </p>
+        {description && <p className="text-xs text-muted-foreground">{description}</p>}
+      </div>
+      <label className="cursor-pointer shrink-0">
+        <input
+          type="file"
+          className="hidden"
+          accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) onAdd(f);
+            e.target.value = "";
+          }}
+        />
+        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-primary bg-accent px-3 py-1.5 rounded-md hover:bg-accent/80 transition-colors">
+          <Plus className="h-3 w-3" /> {files.length > 0 ? "Adicionar mais" : "Anexar"}
+        </span>
+      </label>
     </div>
-    <div className="flex items-center gap-2">
-      {file ? (
-        <>
-          <FileText className="h-4 w-4 text-success shrink-0" />
-          <span className="text-xs text-foreground truncate max-w-[150px]">{file.name}</span>
-          <Button variant="ghost" size="sm" className="text-destructive h-7 px-2" onClick={() => onChange(null)}>✕</Button>
-        </>
-      ) : (
-        <label className="cursor-pointer">
-          <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={(e) => onChange(e.target.files?.[0] || null)} />
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-primary bg-accent px-3 py-1.5 rounded-md hover:bg-accent/80 transition-colors">
-            <Upload className="h-3 w-3" /> Anexar
-          </span>
-        </label>
-      )}
-    </div>
+    {files.length > 0 && (
+      <div className="space-y-1">
+        {files.map((file, index) => (
+          <div key={index} className="flex items-center gap-2 pl-2 py-1 rounded bg-background/50">
+            <FileText className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span className="text-xs text-foreground truncate flex-1">{file.name}</span>
+            <Button variant="ghost" size="sm" className="text-destructive h-6 w-6 p-0" onClick={() => onRemove(index)}>
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        ))}
+      </div>
+    )}
   </div>
 );
 
