@@ -66,17 +66,24 @@ export async function addSubmission(
   // Upload files and create document records
   const docRecords: Array<{ doc_type: string; doc_label: string; file_name: string; storage_path: string }> = [];
 
-  for (const [docKey, file] of Object.entries(files)) {
+  for (const [rawKey, file] of Object.entries(files)) {
     if (!file) continue;
 
+    // Handle multi-file keys like "notaFiscal__2" → base key "notaFiscal", index 2
+    const [baseKey, indexStr] = rawKey.split("__");
+    const fileIndex = indexStr ? parseInt(indexStr) : null;
+
     const ext = file.name.substring(file.name.lastIndexOf("."));
+    const baseLabel = DOC_TYPE_LABELS[baseKey] || baseKey;
+    const labelWithIndex = fileIndex ? `${baseLabel} (${fileIndex})` : baseLabel;
+
     const standardizedName = formatFileName(
       submission.numeroPi,
       submission.nomeVeiculo,
       submission.cidade,
-      docKey,
+      baseKey,
       ext
-    );
+    ).replace(ext, fileIndex ? ` (${fileIndex})${ext}` : ext);
 
     const storagePath = `${sub.cliente}/${sub.campanha}/${sub.numero_pi}/${standardizedName}`;
 
@@ -85,13 +92,13 @@ export async function addSubmission(
       .upload(storagePath, file, { upsert: true });
 
     if (uploadError) {
-      console.error(`Error uploading ${docKey}:`, uploadError);
+      console.error(`Error uploading ${rawKey}:`, uploadError);
       continue;
     }
 
     docRecords.push({
-      doc_type: docKey,
-      doc_label: DOC_TYPE_LABELS[docKey] || docKey,
+      doc_type: baseKey,
+      doc_label: labelWithIndex,
       file_name: standardizedName,
       storage_path: storagePath,
     });
