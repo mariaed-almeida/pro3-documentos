@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, FileText, CheckCircle2, Clock, AlertCircle, Eye, User, Mail, Phone, ExternalLink, MapPin } from "lucide-react";
+import { ArrowLeft, FileText, CheckCircle2, Clock, AlertCircle, Eye, User, Mail, Phone, ExternalLink, MapPin, Download, X, Loader2, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Submission, StatusDocumento } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 
 const statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock; className: string }> = {
   pendente: { label: "Pendente", icon: Clock, className: "bg-warning/10 text-warning border-warning/20" },
@@ -31,6 +34,8 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
   const cfg = statusConfig[submission.status];
   const StatusIcon = cfg.icon;
   const [documents, setDocuments] = useState<DbDocument[]>([]);
+  const [previewDoc, setPreviewDoc] = useState<DbDocument | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -39,7 +44,6 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
         .select("*")
         .eq("submission_id", submission.id);
       if (data) {
-        // Generate signed URLs for each document
         const docsWithUrls = await Promise.all(
           data.map(async (doc) => {
             const { data: urlData } = await supabase.storage
@@ -55,6 +59,45 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
   }, [submission.id]);
 
   const allStatuses: StatusDocumento[] = ["pendente", "em_analise", "corrigido", "rejeitado"];
+
+  const getFileExtension = (name: string) => {
+    const ext = name.split(".").pop()?.toLowerCase() || "";
+    return ext;
+  };
+
+  const isImage = (name: string) => ["jpg", "jpeg", "png", "webp", "gif"].includes(getFileExtension(name));
+  const isPdf = (name: string) => getFileExtension(name) === "pdf";
+  const isPreviewable = (name: string) => isImage(name) || isPdf(name);
+
+  const handleDownloadAll = async () => {
+    if (documents.length === 0) return;
+    setDownloading(true);
+    try {
+      const zip = new JSZip();
+      const folderName = `PI ${submission.numeroPi} - ${submission.nomeVeiculo}`;
+      const folder = zip.folder(folderName)!;
+
+      await Promise.all(
+        documents.map(async (doc) => {
+          if (!doc.signed_url) return;
+          try {
+            const response = await fetch(doc.signed_url);
+            const blob = await response.blob();
+            folder.file(doc.file_name, blob);
+          } catch (err) {
+            console.error(`Failed to fetch ${doc.file_name}:`, err);
+          }
+        })
+      );
+
+      const content = await zip.generateAsync({ type: "blob" });
+      saveAs(content, `${folderName}.zip`);
+    } catch (err) {
+      console.error("Error creating zip:", err);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -110,30 +153,49 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
           </div>
         </div>
 
-        {/* Real Documents from Storage */}
+        {/* Documents */}
         <div className="bg-card rounded-lg border p-5 space-y-4">
-          <h3 className="text-sm font-semibold text-foreground">Documentos Anexados ({documents.length})</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-foreground">Documentos Anexados ({documents.length})</h3>
+            {documents.length > 0 && (
+              <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={handleDownloadAll} disabled={downloading}>
+                {downloading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                {downloading ? "Gerando ZIP..." : "Baixar Todos (.zip)"}
+              </Button>
+            )}
+          </div>
           {documents.length > 0 ? (
             <div className="space-y-2">
-              {documents.map((doc) => (
-                <div key={doc.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                  <FileText className="h-4 w-4 text-primary shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">{doc.doc_label}</p>
-                    <p className="text-xs text-muted-foreground truncate">{doc.file_name}</p>
+              {documents.map((doc) => {
+                const previewable = isPreviewable(doc.file_name);
+                const docIsImage = isImage(doc.file_name);
+                return (
+                  <div key={doc.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                    {docIsImage ? (
+                      <ImageIcon className="h-4 w-4 text-primary shrink-0" />
+                    ) : (
+                      <FileText className="h-4 w-4 text-primary shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground">{doc.doc_label}</p>
+                      <p className="text-xs text-muted-foreground truncate">{doc.file_name}</p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {previewable && doc.signed_url && (
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-primary gap-1"
+                          onClick={() => setPreviewDoc(doc)}>
+                          <Eye className="h-3 w-3" /> Visualizar
+                        </Button>
+                      )}
+                      <a href={doc.signed_url || "#"} target="_blank" rel="noopener noreferrer">
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-primary gap-1" disabled={!doc.signed_url}>
+                          <ExternalLink className="h-3 w-3" /> Abrir
+                        </Button>
+                      </a>
+                    </div>
                   </div>
-                  <a
-                    href={doc.signed_url || "#"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="shrink-0"
-                  >
-                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-primary gap-1" disabled={!doc.signed_url}>
-                      <ExternalLink className="h-3 w-3" /> Abrir
-                    </Button>
-                  </a>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-4">Nenhum documento encontrado.</p>
@@ -158,6 +220,47 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
           </div>
         </div>
       </div>
+
+      {/* Preview Dialog */}
+      <Dialog open={!!previewDoc} onOpenChange={(open) => { if (!open) setPreviewDoc(null); }}>
+        <DialogContent className="max-w-4xl w-[95vw] h-[85vh] p-0 gap-0 overflow-hidden">
+          {previewDoc && (
+            <div className="flex flex-col h-full">
+              <div className="flex items-center justify-between px-4 py-3 border-b bg-card">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground truncate">{previewDoc.doc_label}</p>
+                  <p className="text-xs text-muted-foreground truncate">{previewDoc.file_name}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 ml-4">
+                  <a href={previewDoc.signed_url || "#"} target="_blank" rel="noopener noreferrer" download>
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1">
+                      <Download className="h-3 w-3" /> Baixar
+                    </Button>
+                  </a>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPreviewDoc(null)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-auto bg-muted/30 flex items-center justify-center">
+                {isImage(previewDoc.file_name) ? (
+                  <img
+                    src={previewDoc.signed_url}
+                    alt={previewDoc.doc_label}
+                    className="max-w-full max-h-full object-contain p-4"
+                  />
+                ) : isPdf(previewDoc.file_name) ? (
+                  <iframe
+                    src={previewDoc.signed_url}
+                    className="w-full h-full border-0"
+                    title={previewDoc.doc_label}
+                  />
+                ) : null}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
