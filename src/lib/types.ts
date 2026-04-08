@@ -35,23 +35,8 @@ export interface Submission {
   observacoes?: string;
 }
 
-export const CAMPANHAS: Record<Cliente, string[]> = {
-  "ALESC": [
-    "2026 - Demandas Bancadas Regionais - Fevereiro",
-    "2026 - Institucional",
-    "2026 - Sessões Especiais",
-  ],
-  "Prefeitura de Xanxerê": [
-    "2026 - Obras e Infraestrutura",
-    "2026 - Saúde Municipal",
-    "2026 - Educação",
-  ],
-  "Prefeitura de Chapecó": [
-    "2026 - Desenvolvimento Urbano",
-    "2026 - Cultura e Turismo",
-    "2026 - Serviços Públicos",
-  ],
-};
+// Campaigns are now managed in the database via the "campanhas" table.
+// Use getActiveCampaigns() from "@/lib/campaigns" to fetch them.
 
 // Maps doc keys to human-readable type labels for file naming
 export const DOC_TYPE_LABELS: Record<string, string> = {
