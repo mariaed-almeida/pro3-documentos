@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      campanhas: {
+        Row: {
+          ativa: boolean
+          cliente: string
+          created_at: string
+          id: string
+          nome: string
+        }
+        Insert: {
+          ativa?: boolean
+          cliente: string
+          created_at?: string
+          id?: string
+          nome: string
+        }
+        Update: {
+          ativa?: boolean
+          cliente?: string
+          created_at?: string
+          id?: string
+          nome?: string
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           created_at: string

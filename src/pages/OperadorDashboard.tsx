@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Search, FolderOpen, FileText, ChevronRight,
-  CheckCircle2, Clock, AlertCircle, Eye, Folder, LayoutGrid, List, LogOut, Loader2,
+  CheckCircle2, Clock, AlertCircle, Eye, Folder, LayoutGrid, List, LogOut, Loader2, Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getSubmissions, updateSubmissionStatus, getSubmissionWithDocs } from "@/lib/store";
 import { Submission, StatusDocumento } from "@/lib/types";
 import SubmissionDetail from "@/components/SubmissionDetail";
+import CampanhasManager from "@/pages/CampanhasManager";
 import { supabase } from "@/integrations/supabase/client";
 
 const statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock; className: string }> = {
@@ -30,6 +31,7 @@ const OperadorDashboard = () => {
   const [selectedCampanha, setSelectedCampanha] = useState<string | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCampanhas, setShowCampanhas] = useState(false);
 
   const [authChecked, setAuthChecked] = useState(false);
 
@@ -100,6 +102,10 @@ const OperadorDashboard = () => {
     navigate("/");
   };
 
+  if (showCampanhas) {
+    return <CampanhasManager onBack={() => setShowCampanhas(false)} />;
+  }
+
   if (selectedSubmission) {
     return (
       <SubmissionDetail
@@ -138,6 +144,9 @@ const OperadorDashboard = () => {
           <Badge variant="outline" className="text-sm">
             {submissions.length} envio{submissions.length !== 1 ? "s" : ""}
           </Badge>
+          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => setShowCampanhas(true)}>
+            <Settings className="h-3.5 w-3.5" /> Campanhas
+          </Button>
           <Button variant="ghost" size="icon" onClick={handleLogout} title="Sair">
             <LogOut className="h-4 w-4" />
           </Button>

@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, FileText, CheckCircle2, Clock, AlertCircle, Eye, User, Mail, Phone, ExternalLink, MapPin, Download, X, Loader2, Image as ImageIcon } from "lucide-react";
+import { ArrowLeft, FileText, CheckCircle2, Clock, AlertCircle, Eye, User, Mail, Phone, ExternalLink, MapPin, Download, X, Loader2, Image as ImageIcon, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Submission, StatusDocumento } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 
@@ -31,11 +34,18 @@ interface Props {
 }
 
 const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
+  const { toast } = useToast();
   const cfg = statusConfig[submission.status];
   const StatusIcon = cfg.icon;
   const [documents, setDocuments] = useState<DbDocument[]>([]);
   const [previewDoc, setPreviewDoc] = useState<DbDocument | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
+
+  // Rejection modal
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectMessage, setRejectMessage] = useState("");
+  const [sendingReject, setSendingReject] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -60,14 +70,24 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
 
   const allStatuses: StatusDocumento[] = ["pendente", "em_analise", "corrigido", "rejeitado"];
 
-  const getFileExtension = (name: string) => {
-    const ext = name.split(".").pop()?.toLowerCase() || "";
-    return ext;
-  };
-
+  const getFileExtension = (name: string) => name.split(".").pop()?.toLowerCase() || "";
   const isImage = (name: string) => ["jpg", "jpeg", "png", "webp", "gif"].includes(getFileExtension(name));
   const isPdf = (name: string) => getFileExtension(name) === "pdf";
   const isPreviewable = (name: string) => isImage(name) || isPdf(name);
+
+  const handleDownloadSingle = async (doc: DbDocument) => {
+    if (!doc.signed_url) return;
+    setDownloadingFile(doc.id);
+    try {
+      const response = await fetch(doc.signed_url);
+      const blob = await response.blob();
+      saveAs(blob, doc.file_name);
+    } catch (err) {
+      console.error("Download error:", err);
+    } finally {
+      setDownloadingFile(null);
+    }
+  };
 
   const handleDownloadAll = async () => {
     if (documents.length === 0) return;
@@ -76,7 +96,6 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
       const zip = new JSZip();
       const folderName = `PI ${submission.numeroPi} - ${submission.nomeVeiculo}`;
       const folder = zip.folder(folderName)!;
-
       await Promise.all(
         documents.map(async (doc) => {
           if (!doc.signed_url) return;
@@ -89,13 +108,61 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
           }
         })
       );
-
       const content = await zip.generateAsync({ type: "blob" });
       saveAs(content, `${folderName}.zip`);
     } catch (err) {
       console.error("Error creating zip:", err);
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleStatusClick = (st: StatusDocumento) => {
+    if (st === "rejeitado") {
+      setShowRejectModal(true);
+    } else {
+      onStatusUpdate(submission.id, st);
+    }
+  };
+
+  const handleRejectConfirm = async () => {
+    if (!rejectMessage.trim()) {
+      toast({ title: "Informe o motivo da rejeição", variant: "destructive" });
+      return;
+    }
+    setSendingReject(true);
+    try {
+      // Update status
+      onStatusUpdate(submission.id, "rejeitado");
+
+      // Save observation
+      await supabase
+        .from("submissions")
+        .update({ observacoes: rejectMessage.trim() })
+        .eq("id", submission.id);
+
+      // Send email notification via edge function
+      await supabase.functions.invoke("send-rejection-email", {
+        body: {
+          to: submission.contatoEmail,
+          nomeContato: submission.contatoNome,
+          numeroPi: submission.numeroPi,
+          nomeVeiculo: submission.nomeVeiculo,
+          cliente: submission.cliente,
+          campanha: submission.campanha,
+          motivo: rejectMessage.trim(),
+        },
+      });
+
+      toast({ title: "E-mail de correção enviado ao veículo" });
+      setShowRejectModal(false);
+      setRejectMessage("");
+    } catch (err) {
+      console.error("Error sending rejection:", err);
+      toast({ title: "Status atualizado, mas houve erro ao enviar e-mail", variant: "destructive" });
+      setShowRejectModal(false);
+    } finally {
+      setSendingReject(false);
     }
   };
 
@@ -169,6 +236,7 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
               {documents.map((doc) => {
                 const previewable = isPreviewable(doc.file_name);
                 const docIsImage = isImage(doc.file_name);
+                const isDownloading = downloadingFile === doc.id;
                 return (
                   <div key={doc.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
                     {docIsImage ? (
@@ -187,6 +255,11 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
                           <Eye className="h-3 w-3" /> Visualizar
                         </Button>
                       )}
+                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-primary gap-1"
+                        onClick={() => handleDownloadSingle(doc)} disabled={isDownloading || !doc.signed_url}>
+                        {isDownloading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                        Baixar
+                      </Button>
                       <a href={doc.signed_url || "#"} target="_blank" rel="noopener noreferrer">
                         <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-primary gap-1" disabled={!doc.signed_url}>
                           <ExternalLink className="h-3 w-3" /> Abrir
@@ -212,7 +285,7 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
               const isActive = submission.status === st;
               return (
                 <Button key={st} variant={isActive ? "default" : "outline"} size="sm"
-                  onClick={() => onStatusUpdate(submission.id, st)} disabled={isActive}>
+                  onClick={() => handleStatusClick(st)} disabled={isActive}>
                   <Icon className="h-3 w-3 mr-1.5" />{c.label}
                 </Button>
               );
@@ -232,11 +305,10 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
                   <p className="text-xs text-muted-foreground truncate">{previewDoc.file_name}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0 ml-4">
-                  <a href={previewDoc.signed_url || "#"} target="_blank" rel="noopener noreferrer" download>
-                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1">
-                      <Download className="h-3 w-3" /> Baixar
-                    </Button>
-                  </a>
+                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1"
+                    onClick={() => handleDownloadSingle(previewDoc)}>
+                    <Download className="h-3 w-3" /> Baixar
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPreviewDoc(null)}>
                     <X className="h-4 w-4" />
                   </Button>
@@ -244,21 +316,46 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
               </div>
               <div className="flex-1 overflow-auto bg-muted/30 flex items-center justify-center">
                 {isImage(previewDoc.file_name) ? (
-                  <img
-                    src={previewDoc.signed_url}
-                    alt={previewDoc.doc_label}
-                    className="max-w-full max-h-full object-contain p-4"
-                  />
+                  <img src={previewDoc.signed_url} alt={previewDoc.doc_label} className="max-w-full max-h-full object-contain p-4" />
                 ) : isPdf(previewDoc.file_name) ? (
-                  <iframe
-                    src={previewDoc.signed_url}
-                    className="w-full h-full border-0"
-                    title={previewDoc.doc_label}
-                  />
+                  <iframe src={previewDoc.signed_url} className="w-full h-full border-0" title={previewDoc.doc_label} />
                 ) : null}
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Rejection Modal */}
+      <Dialog open={showRejectModal} onOpenChange={setShowRejectModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              Rejeitar Documentação — PI {submission.numeroPi}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Descreva os problemas encontrados. O veículo <strong>{submission.contatoNome}</strong> receberá um e-mail em <strong>{submission.contatoEmail}</strong> com as instruções de correção.
+            </p>
+            <div className="space-y-1.5">
+              <Label>Motivo da rejeição / O que precisa ser corrigido</Label>
+              <Textarea
+                placeholder="Descreva detalhadamente os ajustes necessários..."
+                value={rejectMessage}
+                onChange={(e) => setRejectMessage(e.target.value)}
+                rows={5}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRejectModal(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleRejectConfirm} disabled={sendingReject} className="gap-1.5">
+              {sendingReject ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {sendingReject ? "Enviando..." : "Rejeitar e Notificar"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

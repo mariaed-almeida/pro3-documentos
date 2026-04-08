@@ -1,16 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Upload, CheckCircle2, FileText, AlertCircle, Plus, X } from "lucide-react";
+import { ArrowLeft, Upload, CheckCircle2, FileText, AlertCircle, Plus, X, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Cliente, TipoVeiculo, CAMPANHAS } from "@/lib/types";
+import { Cliente, TipoVeiculo } from "@/lib/types";
 import { addSubmission } from "@/lib/store";
 import SubmissionReceipt from "@/components/SubmissionReceipt";
 import { Submission } from "@/lib/types";
+import { getActiveCampaigns } from "@/lib/campaigns";
 
 const CLIENTES: Cliente[] = ["ALESC", "Prefeitura de Xanxerê", "Prefeitura de Chapecó"];
 const TIPOS_VEICULO: TipoVeiculo[] = ["Jornal", "Rádio", "Televisão", "Portal", "Mídia Externa", "Outro"];
@@ -61,7 +62,15 @@ const VeiculoForm = () => {
     }));
   };
 
-  const campanhasDisponiveis = cliente ? CAMPANHAS[cliente] : [];
+  const [campanhasDisponiveis, setCampanhasDisponiveis] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (cliente) {
+      getActiveCampaigns(cliente).then(setCampanhasDisponiveis);
+    } else {
+      setCampanhasDisponiveis([]);
+    }
+  }, [cliente]);
 
   const validateStep1 = () => {
     if (!cliente || !campanha || !numeroPi || !tipoVeiculo || !nomeVeiculo || !cidade) {
@@ -291,6 +300,28 @@ const VeiculoForm = () => {
                   onRemove={(i) => handleRemoveFile(key, i)}
                 />
               ))}
+
+              {/* Modelos de documentos para download */}
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                  <Download className="h-4 w-4 text-primary" />
+                  Modelos de Declarações
+                </h3>
+                <p className="text-xs text-muted-foreground mb-3">Baixe os modelos para preenchimento, caso necessário.</p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <a href="/modelos/Modelo_Declaracao_Art_299.pdf" target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline" size="sm" className="text-xs gap-1.5 w-full sm:w-auto">
+                      <Download className="h-3 w-3" /> Modelo - Declaração Art. 299
+                    </Button>
+                  </a>
+                  <a href="/modelos/Modelo_Declaracao_Simples_Nacional.pdf" target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline" size="sm" className="text-xs gap-1.5 w-full sm:w-auto">
+                      <Download className="h-3 w-3" /> Modelo - Declaração Simples Nacional
+                    </Button>
+                  </a>
+                </div>
+              </div>
+
               <div className="border-t pt-4">
                 <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-warning" />
