@@ -1,16 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Upload, CheckCircle2, FileText, AlertCircle, Plus, X } from "lucide-react";
+import { ArrowLeft, Upload, CheckCircle2, FileText, AlertCircle, Plus, X, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Cliente, TipoVeiculo, CAMPANHAS } from "@/lib/types";
+import { Cliente, TipoVeiculo } from "@/lib/types";
 import { addSubmission } from "@/lib/store";
 import SubmissionReceipt from "@/components/SubmissionReceipt";
 import { Submission } from "@/lib/types";
+import { getActiveCampaigns } from "@/lib/campaigns";
 
 const CLIENTES: Cliente[] = ["ALESC", "Prefeitura de Xanxerê", "Prefeitura de Chapecó"];
 const TIPOS_VEICULO: TipoVeiculo[] = ["Jornal", "Rádio", "Televisão", "Portal", "Mídia Externa", "Outro"];
@@ -61,7 +62,15 @@ const VeiculoForm = () => {
     }));
   };
 
-  const campanhasDisponiveis = cliente ? CAMPANHAS[cliente] : [];
+  const [campanhasDisponiveis, setCampanhasDisponiveis] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (cliente) {
+      getActiveCampaigns(cliente).then(setCampanhasDisponiveis);
+    } else {
+      setCampanhasDisponiveis([]);
+    }
+  }, [cliente]);
 
   const validateStep1 = () => {
     if (!cliente || !campanha || !numeroPi || !tipoVeiculo || !nomeVeiculo || !cidade) {
