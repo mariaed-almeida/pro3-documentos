@@ -350,21 +350,22 @@ const VeiculoForm = () => {
 
                 <div className="border-t pt-4">
                   <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-warning" />
-                  Certidões Negativas
-                </h3>
-                <p className="text-xs text-muted-foreground mb-3">{certidaoAviso}</p>
-                <div className="space-y-3">
-                  {certidaoLabels.map((label, i) => (
-                    <MultiFileUploadField
-                      key={`certidao${i + 1}`}
-                      label={label}
-                      required={false}
-                      files={docs[`certidao${i + 1}`] || []}
-                      onAdd={(f) => handleAddFile(`certidao${i + 1}`, f)}
-                      onRemove={(idx) => handleRemoveFile(`certidao${i + 1}`, idx)}
-                    />
-                  ))}
+                    <AlertCircle className="h-4 w-4 text-warning" />
+                    Certidões Negativas
+                  </h3>
+                  <p className="text-xs text-muted-foreground mb-3">{certidaoAviso}</p>
+                  <div className="space-y-3">
+                    {certidaoLabels.map((label, i) => (
+                      <MultiFileUploadField
+                        key={`certidao${i + 1}`}
+                        label={label}
+                        required={false}
+                        files={docs[`certidao${i + 1}`] || []}
+                        onAdd={(f) => handleAddFile(`certidao${i + 1}`, f)}
+                        onRemove={(idx) => handleRemoveFile(`certidao${i + 1}`, idx)}
+                      />
+                    ))}
+                  </div>
                 </div>
               </section>
             </div>
