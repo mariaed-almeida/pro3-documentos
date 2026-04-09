@@ -12,6 +12,7 @@ import { addSubmission } from "@/lib/store";
 import SubmissionReceipt from "@/components/SubmissionReceipt";
 import { Submission } from "@/lib/types";
 import { getActiveCampaigns } from "@/lib/campaigns";
+import { downloadFileFromUrl } from "@/lib/file-download";
 
 const CLIENTES: Cliente[] = ["ALESC", "Prefeitura de Xanxerê", "Prefeitura de Chapecó"];
 const TIPOS_VEICULO: TipoVeiculo[] = ["Jornal", "Rádio", "Televisão", "Portal", "Mídia Externa", "Outro"];
@@ -141,6 +142,19 @@ const VeiculoForm = () => {
       toast({ title: "Erro", description: "Falha ao enviar documentação.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleTemplateDownload = async (url: string, fileName: string) => {
+    try {
+      await downloadFileFromUrl(url, fileName);
+    } catch (error) {
+      console.error("Template download error:", error);
+      toast({
+        title: "Erro ao baixar modelo",
+        description: "Tente novamente em instantes.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -287,60 +301,73 @@ const VeiculoForm = () => {
         {step === 3 && (
           <div className="bg-card rounded-lg border p-6 animate-fade-in space-y-6">
             <h2 className="text-lg font-semibold text-foreground">Documentação</h2>
-            <p className="text-sm text-muted-foreground">Anexe os documentos necessários. Campos com * são obrigatórios. Você pode adicionar mais de um arquivo por item.</p>
             <div className="space-y-4">
-              {docFields.map(({ key, label, required, desc }) => (
-                <MultiFileUploadField
-                  key={key}
-                  label={label}
-                  description={desc}
-                  required={required}
-                  files={docs[key] || []}
-                  onAdd={(f) => handleAddFile(key, f)}
-                  onRemove={(i) => handleRemoveFile(key, i)}
-                />
-              ))}
-
-              {/* Modelos de documentos para download */}
-              <div className="border-t pt-4">
-                <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+              <section className="rounded-xl border bg-muted/20 p-5 space-y-3">
+                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                   <Download className="h-4 w-4 text-primary" />
-                  Modelos de Declarações
+                  Modelos
                 </h3>
-                <p className="text-xs text-muted-foreground mb-3">Baixe os modelos para preenchimento, caso necessário.</p>
+                <p className="text-sm text-muted-foreground">Baixe primeiro os modelos de apoio para preenchimento, se necessário.</p>
                 <div className="flex flex-col sm:flex-row gap-2">
-                  <a href="/modelos/Modelo_Declaracao_Art_299.pdf" target="_blank" rel="noopener noreferrer">
-                    <Button variant="outline" size="sm" className="text-xs gap-1.5 w-full sm:w-auto">
-                      <Download className="h-3 w-3" /> Modelo - Declaração Art. 299
-                    </Button>
-                  </a>
-                  <a href="/modelos/Modelo_Declaracao_Simples_Nacional.pdf" target="_blank" rel="noopener noreferrer">
-                    <Button variant="outline" size="sm" className="text-xs gap-1.5 w-full sm:w-auto">
-                      <Download className="h-3 w-3" /> Modelo - Declaração Simples Nacional
-                    </Button>
-                  </a>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs gap-1.5 w-full sm:w-auto"
+                    onClick={() => handleTemplateDownload("/modelos/Modelo_Declaracao_Art_299.pdf", "Modelo_Declaracao_Art_299.pdf")}
+                  >
+                    <Download className="h-3 w-3" /> Modelo - Declaração Art. 299
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs gap-1.5 w-full sm:w-auto"
+                    onClick={() => handleTemplateDownload("/modelos/Modelo_Declaracao_Simples_Nacional.pdf", "Modelo_Declaracao_Simples_Nacional.pdf")}
+                  >
+                    <Download className="h-3 w-3" /> Modelo - Declaração Simples Nacional
+                  </Button>
                 </div>
-              </div>
+              </section>
 
-              <div className="border-t pt-4">
-                <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-warning" />
-                  Certidões Negativas
-                </h3>
-                <p className="text-xs text-muted-foreground mb-3">{certidaoAviso}</p>
-                <div className="space-y-3">
-                  {certidaoLabels.map((label, i) => (
-                    <MultiFileUploadField
-                      key={`certidao${i + 1}`}
-                      label={label}
-                      required={false}
-                      files={docs[`certidao${i + 1}`] || []}
-                      onAdd={(f) => handleAddFile(`certidao${i + 1}`, f)}
-                      onRemove={(idx) => handleRemoveFile(`certidao${i + 1}`, idx)}
-                    />
-                  ))}
+              <section className="rounded-xl border p-5 space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Documentos a Enviar</h3>
+                  <p className="text-sm text-muted-foreground mt-1">Anexe os documentos necessários. Campos com * são obrigatórios. Você pode adicionar mais de um arquivo por item.</p>
                 </div>
-              </div>
+
+                {docFields.map(({ key, label, required, desc }) => (
+                  <MultiFileUploadField
+                    key={key}
+                    label={label}
+                    description={desc}
+                    required={required}
+                    files={docs[key] || []}
+                    onAdd={(f) => handleAddFile(key, f)}
+                    onRemove={(i) => handleRemoveFile(key, i)}
+                  />
+                ))}
+
+                <div className="border-t pt-4">
+                  <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-warning" />
+                    Certidões Negativas
+                  </h3>
+                  <p className="text-xs text-muted-foreground mb-3">{certidaoAviso}</p>
+                  <div className="space-y-3">
+                    {certidaoLabels.map((label, i) => (
+                      <MultiFileUploadField
+                        key={`certidao${i + 1}`}
+                        label={label}
+                        required={false}
+                        files={docs[`certidao${i + 1}`] || []}
+                        onAdd={(f) => handleAddFile(`certidao${i + 1}`, f)}
+                        onRemove={(idx) => handleRemoveFile(`certidao${i + 1}`, idx)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </section>
             </div>
             <div className="flex justify-between pt-4">
               <Button variant="outline" onClick={() => setStep(2)}>Voltar</Button>

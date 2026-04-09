@@ -89,7 +89,10 @@ export async function addSubmission(
 
     const { error: uploadError } = await supabase.storage
       .from("documentos")
-      .upload(storagePath, file, { upsert: true });
+      .upload(storagePath, file, {
+        upsert: false,
+        contentType: file.type || undefined,
+      });
 
     if (uploadError) {
       console.error(`Error uploading ${rawKey}:`, uploadError);
