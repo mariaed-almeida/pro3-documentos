@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
+import { downloadFileFromUrl, openFileFromUrl } from "@/lib/file-download";
 
 const statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock; className: string }> = {
   pendente: { label: "Pendente", icon: Clock, className: "bg-warning/10 text-warning border-warning/20" },
@@ -79,13 +80,23 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
     if (!doc.signed_url) return;
     setDownloadingFile(doc.id);
     try {
-      const response = await fetch(doc.signed_url);
-      const blob = await response.blob();
-      saveAs(blob, doc.file_name);
+      await downloadFileFromUrl(doc.signed_url, doc.file_name);
     } catch (err) {
       console.error("Download error:", err);
+      toast({ title: "Erro ao baixar arquivo", variant: "destructive" });
     } finally {
       setDownloadingFile(null);
+    }
+  };
+
+  const handleOpenFile = async (doc: DbDocument) => {
+    if (!doc.signed_url) return;
+
+    try {
+      await openFileFromUrl(doc.signed_url);
+    } catch (err) {
+      console.error("Open file error:", err);
+      toast({ title: "Erro ao abrir arquivo", variant: "destructive" });
     }
   };
 
@@ -260,11 +271,15 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
                         {isDownloading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
                         Baixar
                       </Button>
-                      <a href={doc.signed_url || "#"} target="_blank" rel="noopener noreferrer">
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-primary gap-1" disabled={!doc.signed_url}>
-                          <ExternalLink className="h-3 w-3" /> Abrir
-                        </Button>
-                      </a>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs text-primary gap-1"
+                        onClick={() => handleOpenFile(doc)}
+                        disabled={!doc.signed_url}
+                      >
+                        <ExternalLink className="h-3 w-3" /> Abrir
+                      </Button>
                     </div>
                   </div>
                 );
