@@ -108,12 +108,23 @@ export async function addSubmission(
   }
 
   if (docRecords.length > 0) {
-    await supabase.from("documents").insert(
+    const { error: documentsError } = await supabase.from("documents").insert(
       docRecords.map((d) => ({ ...d, submission_id: sub.id }))
     );
+
+    if (documentsError) {
+      console.error("Error creating document records:", documentsError);
+    }
   }
 
-  return getSubmissionWithDocs(sub.id);
+  return mapDbToSubmission(sub, docRecords.map((doc, index) => ({
+    id: `${sub.id}-${index}`,
+    submission_id: sub.id,
+    doc_type: doc.doc_type,
+    doc_label: doc.doc_label,
+    file_name: doc.file_name,
+    storage_path: doc.storage_path,
+  })));
 }
 
 export async function updateSubmissionStatus(id: string, status: StatusDocumento): Promise<void> {
