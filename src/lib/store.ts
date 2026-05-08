@@ -34,6 +34,15 @@ export async function getSubmissionWithDocs(id: string): Promise<Submission | nu
   return mapDbToSubmission(sub, docs || []);
 }
 
+function sanitizePathSegment(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // remove accents
+    .replace(/[^a-zA-Z0-9._\- ]/g, "") // strip special chars (keep spaces, dots, dashes)
+    .replace(/\s+/g, " ")
+    .trim() || "arquivo";
+}
+
 export async function addSubmission(
   submission: Omit<Submission, "id" | "dataEnvio" | "status" | "documentos">,
   files: Record<string, File>
