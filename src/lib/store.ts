@@ -94,7 +94,8 @@ export async function addSubmission(
       ext
     ).replace(ext, fileIndex ? ` (${fileIndex})${ext}` : ext);
 
-    const storagePath = `${sub.cliente}/${sub.campanha}/${sub.numero_pi}/${standardizedName}`;
+    const safeName = sanitizePathSegment(standardizedName.replace(ext, "")) + ext;
+    const storagePath = `${sanitizePathSegment(sub.cliente)}/${sanitizePathSegment(sub.campanha)}/${sanitizePathSegment(sub.numero_pi)}/${safeName}`;
 
     const { error: uploadError } = await supabase.storage
       .from("documentos")
@@ -105,15 +106,22 @@ export async function addSubmission(
 
     if (uploadError) {
       console.error(`Error uploading ${rawKey}:`, uploadError);
+      uploadErrors.push(`${labelWithIndex}: ${uploadError.message}`);
       continue;
     }
 
     docRecords.push({
       doc_type: baseKey,
       doc_label: labelWithIndex,
-      file_name: standardizedName,
+      file_name: safeName,
       storage_path: storagePath,
     });
+  }
+
+  if (uploadErrors.length > 0) {
+    // Rollback the submission so the operator doesn't see an empty PI
+    await supabase.from("submissions").delete().eq("id", sub.id);
+    throw new Error(`Falha ao enviar arquivos:\n${uploadErrors.join("\n")}`);
   }
 
   if (docRecords.length > 0) {
@@ -123,6 +131,7 @@ export async function addSubmission(
 
     if (documentsError) {
       console.error("Error creating document records:", documentsError);
+      throw new Error(`Falha ao registrar documentos: ${documentsError.message}`);
     }
   }
 
