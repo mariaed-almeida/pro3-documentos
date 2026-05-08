@@ -21,7 +21,7 @@ const Index = () => {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 -mt-12">
+      <div className="flex-1 flex flex-col items-center justify-center p-6">
         <div className="text-center mb-10 animate-fade-in">
           <img src={logoPro3} alt="Pro3 Comunicação" className="h-20 mx-auto mb-6" />
           <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-3">
