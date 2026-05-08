@@ -74,6 +74,7 @@ export async function addSubmission(
 
   // Upload files and create document records
   const docRecords: Array<{ doc_type: string; doc_label: string; file_name: string; storage_path: string }> = [];
+  const uploadErrors: string[] = [];
 
   for (const [rawKey, file] of Object.entries(files)) {
     if (!file) continue;
