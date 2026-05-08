@@ -137,9 +137,9 @@ const VeiculoForm = () => {
       } else {
         toast({ title: "Erro", description: "Falha ao enviar documentação. Tente novamente.", variant: "destructive" });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast({ title: "Erro", description: "Falha ao enviar documentação.", variant: "destructive" });
+      toast({ title: "Erro ao enviar documentação", description: err?.message || "Tente novamente.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
