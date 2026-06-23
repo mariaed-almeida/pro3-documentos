@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Search, FolderOpen, FileText, ChevronRight,
   CheckCircle2, Clock, AlertCircle, Eye, Folder, LayoutGrid, List, LogOut, Loader2, Settings,
+  BadgeCheck, CircleDollarSign,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,10 +16,12 @@ import CampanhasManager from "@/pages/CampanhasManager";
 import { supabase } from "@/integrations/supabase/client";
 
 const statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock; className: string }> = {
-  pendente: { label: "Pendente", icon: Clock, className: "bg-warning/10 text-warning border-warning/20" },
-  em_analise: { label: "Em Análise", icon: Eye, className: "bg-primary/10 text-primary border-primary/20" },
-  corrigido: { label: "Corrigido", icon: CheckCircle2, className: "bg-success/10 text-success border-success/20" },
-  rejeitado: { label: "Rejeitado", icon: AlertCircle, className: "bg-destructive/10 text-destructive border-destructive/20" },
+  pendente:    { label: "Pendente",    icon: Clock,             className: "bg-warning/10 text-warning border-warning/20" },
+  em_analise:  { label: "Em Análise", icon: Eye,               className: "bg-primary/10 text-primary border-primary/20" },
+  corrigido:   { label: "Corrigido",  icon: CheckCircle2,      className: "bg-success/10 text-success border-success/20" },
+  rejeitado:   { label: "Rejeitado",  icon: AlertCircle,       className: "bg-destructive/10 text-destructive border-destructive/20" },
+  aprovado:    { label: "Aprovado",   icon: BadgeCheck,        className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" },
+  faturado:    { label: "Faturado",   icon: CircleDollarSign,  className: "bg-violet-500/10 text-violet-600 border-violet-500/20" },
 };
 
 const OperadorDashboard = () => {
@@ -154,8 +157,8 @@ const OperadorDashboard = () => {
       </header>
 
       <div className="max-w-6xl mx-auto px-6 py-6 space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {(["pendente", "em_analise", "corrigido", "rejeitado"] as StatusDocumento[]).map((st) => {
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {(["pendente", "em_analise", "corrigido", "rejeitado", "aprovado", "faturado"] as StatusDocumento[]).map((st) => {
             const cfg = statusConfig[st];
             const count = submissions.filter((s) => s.status === st).length;
             const Icon = cfg.icon;
@@ -184,6 +187,8 @@ const OperadorDashboard = () => {
               <SelectItem value="em_analise">Em Análise</SelectItem>
               <SelectItem value="corrigido">Corrigido</SelectItem>
               <SelectItem value="rejeitado">Rejeitado</SelectItem>
+              <SelectItem value="aprovado">Aprovado</SelectItem>
+              <SelectItem value="faturado">Faturado</SelectItem>
             </SelectContent>
           </Select>
         </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Upload, CheckCircle2, FileText, AlertCircle, Plus, X, Download } from "lucide-react";
+import { ArrowLeft, Upload, CheckCircle2, FileText, AlertCircle, Plus, X, Download, Info, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,61 @@ import { downloadFileFromUrl } from "@/lib/file-download";
 
 const CLIENTES: Cliente[] = ["ALESC", "Prefeitura de Xanxerê", "Prefeitura de Chapecó"];
 const TIPOS_VEICULO: TipoVeiculo[] = ["Jornal", "Rádio", "Televisão", "Portal", "Mídia Externa", "Outro"];
+
+const ORIENTACOES_CLIENTE: Record<Cliente, {
+  cnpj: string;
+  contratoInfo: string[];
+  observacoesNF: string[];
+  enderecoPostal: string;
+}> = {
+  "ALESC": {
+    cnpj: "83.599.191/0001-87",
+    contratoInfo: [
+      "Contrato nº 031/2023",
+      "Edital nº 001/2022",
+    ],
+    observacoesNF: [
+      "A Nota Fiscal deve ser emitida somente após o término da veiculação.",
+      "Utilize o modelo 62 (conforme Ajuste SINIEF nº 7/2022).",
+      "O campo VALOR deve conter apenas o valor líquido. Bruto e comissão de agência devem constar na descrição.",
+      "Empresas sujeitas à retenção: destacar IR à alíquota de 4,8%. Empresas isentas: descrever o artigo de isenção e apresentar declaração.",
+      "Inclua os dados bancários no corpo da NF ou no campo de informações adicionais.",
+    ],
+    enderecoPostal: "Av. Prefeito Osmar Cunha, 416, Sala 905 — Ed. Koerich — Florianópolis/SC — CEP 88.015-100",
+  },
+  "Prefeitura de Chapecó": {
+    cnpj: "83.021.808/0001-82",
+    contratoInfo: [
+      "Contrato nº 371/2025",
+      "Concorrência nº 186/2025",
+    ],
+    observacoesNF: [
+      "A Nota Fiscal deve ser emitida somente após o término da veiculação.",
+      "Faturar o valor líquido diretamente contra a Prefeitura de Chapecó.",
+      "O campo VALOR deve conter apenas o valor líquido. Bruto e comissão de agência devem constar na descrição.",
+      "Empresas sujeitas à retenção: destacar IR à alíquota de 4,8%. Empresas isentas: descrever o artigo de isenção e apresentar declaração.",
+      "Inclua os dados bancários no corpo da NF ou no campo de informações adicionais.",
+    ],
+    enderecoPostal: "Av. Nereu Ramos, 75D, Sala 707A — Centro Profissional Chapecó — Chapecó/SC — CEP 89801-023",
+  },
+  "Prefeitura de Xanxerê": {
+    cnpj: "83.009.860/0001-13",
+    contratoInfo: [
+      "Processo Licitatório nº 0066/2025",
+      "Concorrência nº 0001/2025",
+      "Contrato nº 0180/2025",
+    ],
+    observacoesNF: [
+      "A Nota Fiscal deve ser emitida somente após o término da veiculação.",
+      "Faturar o valor líquido diretamente contra a Prefeitura de Xanxerê.",
+      "A NF deve conter o texto: \"Documento emitido em nome do tomador do serviço aos cuidados da Agência Pro3 Comunicação\".",
+      "O campo VALOR deve conter apenas o valor líquido. Bruto e comissão de agência devem constar na descrição.",
+      "Empresas sujeitas à retenção: destacar IR à alíquota de 4,8%. Empresas isentas: descrever o artigo de isenção e apresentar declaração.",
+      "Inclua os dados bancários no corpo da NF ou no campo de informações adicionais.",
+    ],
+    enderecoPostal: "Rua Ouro Preto, 315 — Bairro Tonial — Xanxerê/SC — CEP 89820-000",
+  },
+};
 
 const VeiculoForm = () => {
   const navigate = useNavigate();
@@ -36,11 +91,14 @@ const VeiculoForm = () => {
   const [contatoEmail, setContatoEmail] = useState("");
   const [contatoTelefone, setContatoTelefone] = useState("");
   const [observacoes, setObservacoes] = useState("");
+  const [simplesNacional, setSimplesNacional] = useState(false);
 
   // Multi-file support: each doc key maps to an array of files
   const [docs, setDocs] = useState<Record<string, File[]>>({
     piAssinado: [],
     notaFiscal: [],
+    notaFiscalGrafica: [],
+    fotoMidiaExterna: [],
     declaracaoSimplesNacional: [],
     comprovantesExibicao: [],
     declaracaoArtigo299: [],
@@ -94,8 +152,23 @@ const VeiculoForm = () => {
   };
 
   const handleSubmit = async () => {
-    if (cliente !== "ALESC" && docs.piAssinado.length === 0) {
-      toast({ title: "Documento obrigatório", description: "O PI Assinado é obrigatório.", variant: "destructive" });
+    // Valida todos os documentos marcados como obrigatórios
+    const camposObrigatorios = docFields.filter((f) => f.required);
+    const faltando = camposObrigatorios.filter((f) => (docs[f.key] || []).length === 0);
+
+    // Valida as 5 certidões obrigatórias
+    const certidoesFaltando = [1, 2, 3, 4, 5].filter((i) => (docs[`certidao${i}`] || []).length === 0);
+
+    if (faltando.length > 0 || certidoesFaltando.length > 0) {
+      const nomes = [
+        ...faltando.map((f) => f.label),
+        ...certidoesFaltando.map((i) => certidaoLabels[i - 1]),
+      ];
+      toast({
+        title: "Documentos obrigatórios faltando",
+        description: `Anexe os seguintes documentos antes de enviar:\n• ${nomes.join("\n• ")}`,
+        variant: "destructive",
+      });
       return;
     }
 
@@ -162,13 +235,18 @@ const VeiculoForm = () => {
     return <SubmissionReceipt submission={submittedData} />;
   }
 
+  const isJornal = tipoVeiculo === "Jornal";
+  const isMidiaExterna = tipoVeiculo === "Mídia Externa";
+
   const docFields = [
     ...(cliente !== "ALESC" ? [{ key: "piAssinado", label: "PI Assinado", required: true, desc: "Pedido de Inserção devidamente assinado" }] : []),
-    { key: "notaFiscal", label: "Nota Fiscal", required: false, desc: "Nota Fiscal referente ao serviço prestado" },
-    { key: "declaracaoSimplesNacional", label: "Declaração como Optante pelo Simples Nacional", required: false, desc: "Documento comprovatório de dispensa de retenção do IRRF (Caso não seja Optante, não inclua nenhum documento)" },
-    { key: "comprovantesExibicao", label: "Comprovantes de Exibição", required: false, desc: "Comprovantes de veiculação da campanha" },
-    { key: "declaracaoArtigo299", label: "Declaração do Artigo 299", required: false, desc: "Declaração conforme Art. 299 do Código Penal" },
-    { key: "tabelaPrecoAssinada", label: "Tabela de Preço Assinada", required: false, desc: "Tabela de preços do veículo assinada" },
+    { key: "notaFiscal", label: "Nota Fiscal", required: true, desc: "Nota Fiscal referente ao serviço prestado" },
+    { key: "declaracaoArtigo299", label: "Declaração do Artigo 299", required: true, desc: "Declaração conforme Art. 299 do Código Penal" },
+    { key: "tabelaPrecoAssinada", label: "Tabela de Preço Assinada", required: true, desc: "Tabela de preços do veículo assinada" },
+    ...(simplesNacional ? [{ key: "declaracaoSimplesNacional", label: "Declaração de Optante pelo Simples Nacional", required: true, desc: "Documento comprovatório de dispensa de retenção do IRRF" }] : []),
+    ...(!isMidiaExterna ? [{ key: "comprovantesExibicao", label: "Comprovantes de Exibição", required: true, desc: "Comprovantes de veiculação da campanha (prints, declarações, comprovantes assinados)" }] : []),
+    ...(isJornal ? [{ key: "notaFiscalGrafica", label: "Nota Fiscal da Gráfica", required: true, desc: "NF da gráfica comprovando a tiragem do jornal" }] : []),
+    ...(isMidiaExterna ? [{ key: "fotoMidiaExterna", label: "Foto do Ponto de Exibição", required: true, desc: "Foto do outdoor/painel no local de veiculação" }] : []),
   ];
 
   const certidaoLabels = [
@@ -264,7 +342,64 @@ const VeiculoForm = () => {
                 </div>
               )}
             </div>
-            <div className="flex justify-end pt-4">
+
+            {/* Bloco de orientações dinâmicas por cliente */}
+            {cliente && (() => {
+              const info = ORIENTACOES_CLIENTE[cliente as Cliente];
+              if (!info) return null;
+              return (
+                <div className="rounded-xl border-2 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-5 space-y-4 mt-2">
+                  <div className="flex items-center gap-2">
+                    <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                      Orientações para emissão da Nota Fiscal — {cliente}
+                    </h3>
+                  </div>
+
+                  {/* CNPJ e referências contratuais */}
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">Dados do tomador de serviço</p>
+                    <p className="text-sm text-amber-900 dark:text-amber-200">
+                      <span className="font-medium">CNPJ:</span> {info.cnpj}
+                    </p>
+                    {info.contratoInfo.map((linha, i) => (
+                      <p key={i} className="text-sm text-amber-900 dark:text-amber-200">
+                        <span className="font-medium">{i === 0 ? "Referências obrigatórias na NF:" : ""}</span>{i === 0 ? " " : "· "}{linha}
+                      </p>
+                    ))}
+                  </div>
+
+                  {/* Observações da NF */}
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">Regras de emissão</p>
+                    <ul className="space-y-1">
+                      {info.observacoesNF.map((obs, i) => (
+                        <li key={i} className="text-sm text-amber-900 dark:text-amber-200 flex gap-2">
+                          <span className="text-amber-500 shrink-0 mt-0.5">›</span>
+                          <span>{obs}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Endereço postal — só aparece quando tipo é Jornal */}
+                  {tipoVeiculo === "Jornal" && (
+                    <div className="rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-100 dark:bg-amber-900/40 p-3 space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <MapPin className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                        <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">Envio físico obrigatório — Jornal</p>
+                      </div>
+                      <p className="text-sm text-amber-900 dark:text-amber-200">
+                        Além do envio digital, encaminhe <strong>2 exemplares originais</strong> pelo correio para:
+                      </p>
+                      <p className="text-sm font-medium text-amber-900 dark:text-amber-100">{info.enderecoPostal}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            <div className="flex justify-end pt-2">
               <Button onClick={() => validateStep1() && setStep(2)}>Próximo</Button>
             </div>
           </div>
@@ -336,6 +471,30 @@ const VeiculoForm = () => {
                   <p className="text-sm text-muted-foreground mt-1">Anexe os documentos necessários. Campos com * são obrigatórios. Você pode adicionar mais de um arquivo por item.</p>
                 </div>
 
+                {/* Checkbox Simples Nacional */}
+                <div
+                  className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
+                    simplesNacional
+                      ? "border-primary bg-primary/5"
+                      : "border-muted bg-muted/20 hover:border-muted-foreground/30"
+                  }`}
+                  onClick={() => setSimplesNacional((prev) => !prev)}
+                >
+                  <div className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                    simplesNacional ? "border-primary bg-primary" : "border-muted-foreground/50 bg-background"
+                  }`}>
+                    {simplesNacional && (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-primary-foreground" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Nossa empresa é optante pelo Simples Nacional</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Ao marcar esta opção, a <strong>Declaração de Optante pelo Simples Nacional</strong> se torna obrigatória e você deverá anexá-la abaixo.
+                    </p>
+                  </div>
+                </div>
+
                 {docFields.map(({ key, label, required, desc }) => (
                   <MultiFileUploadField
                     key={key}
@@ -359,7 +518,7 @@ const VeiculoForm = () => {
                       <MultiFileUploadField
                         key={`certidao${i + 1}`}
                         label={label}
-                        required={false}
+                        required={true}
                         files={docs[`certidao${i + 1}`] || []}
                         onAdd={(f) => handleAddFile(`certidao${i + 1}`, f)}
                         onRemove={(idx) => handleRemoveFile(`certidao${i + 1}`, idx)}

@@ -2,7 +2,7 @@ export type Cliente = "ALESC" | "Prefeitura de Xanxerê" | "Prefeitura de Chapec
 
 export type TipoVeiculo = "Jornal" | "Rádio" | "Televisão" | "Portal" | "Mídia Externa" | "Outro";
 
-export type StatusDocumento = "pendente" | "em_analise" | "corrigido" | "rejeitado";
+export type StatusDocumento = "pendente" | "em_analise" | "corrigido" | "rejeitado" | "aprovado" | "faturado";
 
 export interface DocumentoUpload {
   nome: string;
@@ -24,6 +24,9 @@ export interface Submission {
   contatoTelefone: string;
   documentos: {
     piAssinado?: string;
+    notaFiscal?: string;
+    notaFiscalGrafica?: string;
+    fotoMidiaExterna?: string;
     declaracaoSimplesNacional?: string;
     comprovantesExibicao?: string;
     declaracaoArtigo299?: string;
@@ -42,6 +45,8 @@ export interface Submission {
 export const DOC_TYPE_LABELS: Record<string, string> = {
   piAssinado: "PI Assinado",
   notaFiscal: "Nota Fiscal",
+  notaFiscalGrafica: "Nota Fiscal Grafica",
+  fotoMidiaExterna: "Foto Midia Externa",
   declaracaoSimplesNacional: "Declaracao Simples Nacional",
   comprovantesExibicao: "Comprovantes de Exibicao",
   declaracaoArtigo299: "Declaracao Artigo 299",
