@@ -47,10 +47,15 @@ export async function addSubmission(
   submission: Omit<Submission, "id" | "dataEnvio" | "status" | "documentos">,
   files: Record<string, File>
 ): Promise<Submission | null> {
-  // Insert submission
-  const { data: sub, error } = await supabase
+  // Geramos o id e a data no navegador para não precisar pedir esses dados de volta ao banco.
+  // Isso evita usar SELECT (que veículos sem login não têm permissão de fazer) — só usamos INSERT.
+  const submissionId = crypto.randomUUID();
+  const dataEnvio = new Date().toISOString();
+
+  const { error } = await supabase
     .from("submissions")
     .insert({
+      id: submissionId,
       cliente: submission.cliente,
       campanha: submission.campanha,
       numero_pi: submission.numeroPi,
@@ -63,14 +68,32 @@ export async function addSubmission(
       contato_telefone: submission.contatoTelefone,
       observacoes: submission.observacoes || null,
       status: "pendente",
-    })
-    .select()
-    .single();
+      data_envio: dataEnvio,
+    });
 
-  if (error || !sub) {
+  if (error) {
     console.error("Error creating submission:", error);
     return null;
   }
+
+  // "sub" guarda os dados que já tínhamos em mãos, no formato que mapDbToSubmission espera —
+  // não precisamos buscar nada de volta no banco.
+  const sub = {
+    id: submissionId,
+    cliente: submission.cliente,
+    campanha: submission.campanha,
+    numero_pi: submission.numeroPi,
+    tipo_veiculo: submission.tipoVeiculo,
+    outro_tipo: submission.outroTipo || null,
+    nome_veiculo: submission.nomeVeiculo,
+    cidade: submission.cidade,
+    contato_nome: submission.contatoNome,
+    contato_email: submission.contatoEmail,
+    contato_telefone: submission.contatoTelefone,
+    status: "pendente",
+    observacoes: submission.observacoes || null,
+    data_envio: dataEnvio,
+  };
 
   // Upload files and create document records
   const docRecords: Array<{ doc_type: string; doc_label: string; file_name: string; storage_path: string }> = [];
@@ -120,8 +143,9 @@ export async function addSubmission(
   }
 
   if (uploadErrors.length > 0) {
-    // Rollback the submission so the operator doesn't see an empty PI
-    await supabase.from("submissions").delete().eq("id", sub.id);
+    // Veículos sem login não podem apagar nem alterar o status da submission (regra de segurança).
+    // O PI fica registrado como "pendente" mesmo sem os arquivos que falharam, e o operador
+    // poderá identificar e tratar isso manualmente ao revisar o processo.
     throw new Error(`Falha ao enviar arquivos:\n${uploadErrors.join("\n")}`);
   }
 
@@ -203,8 +227,6 @@ function mapDbToSubmission(sub: DbSubmission, docs: DbDocument[] = []): Submissi
       certidoes.push(doc.file_name);
     } else if (doc.doc_type === "piAssinado") {
       documentos.piAssinado = doc.file_name;
-    } else if (doc.doc_type === "notaFiscal") {
-      (documentos as any).notaFiscal = doc.file_name;
     } else if (doc.doc_type === "declaracaoSimplesNacional") {
       documentos.declaracaoSimplesNacional = doc.file_name;
     } else if (doc.doc_type === "comprovantesExibicao") {
