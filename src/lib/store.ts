@@ -227,12 +227,6 @@ function mapDbToSubmission(sub: DbSubmission, docs: DbDocument[] = []): Submissi
       certidoes.push(doc.file_name);
     } else if (doc.doc_type === "piAssinado") {
       documentos.piAssinado = doc.file_name;
-    } else if (doc.doc_type === "notaFiscal") {
-      documentos.notaFiscal = doc.file_name;
-    } else if (doc.doc_type === "notaFiscalGrafica") {
-      documentos.notaFiscalGrafica = doc.file_name;
-    } else if (doc.doc_type === "fotoMidiaExterna") {
-      documentos.fotoMidiaExterna = doc.file_name;
     } else if (doc.doc_type === "declaracaoSimplesNacional") {
       documentos.declaracaoSimplesNacional = doc.file_name;
     } else if (doc.doc_type === "comprovantesExibicao") {
