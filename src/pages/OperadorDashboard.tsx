@@ -319,47 +319,123 @@ const CardView = ({
   }
 
   const subs = grouped[selectedCliente]?.[selectedCampanha] || [];
+
+  // Agrupamos por número do PI: se o mesmo veículo reenviar o mesmo número de PI
+  // (ex: depois de uma correção), tratamos como o mesmo processo, não como dois PIs soltos.
+  const subsByNumeroPi = groupSubmissionsByPi(subs);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {subs.map((s) => {
-        const cfg = statusConfig[s.status];
-        const Icon = cfg.icon;
-        return (
-          <button key={s.id} onClick={() => onSelectSubmission(s)}
-            className="bg-card rounded-xl border p-5 hover:shadow-lg hover:border-primary/30 transition-all text-left group">
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                  <FileText className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-foreground">PI {s.numeroPi}</h3>
-                  <p className="text-sm text-muted-foreground">{s.nomeVeiculo}</p>
-                </div>
-              </div>
-              <Badge variant="outline" className={`text-xs ${cfg.className}`}>
-                <Icon className="h-3 w-3 mr-1" />{cfg.label}
-              </Badge>
+      {subsByNumeroPi.map((group) => (
+        <PiGroupCard key={group.numeroPi} group={group} statusConfig={statusConfig}
+          onSelectSubmission={onSelectSubmission} onStatusUpdate={onStatusUpdate} />
+      ))}
+    </div>
+  );
+};
+
+// Agrupa as submissions de uma campanha pelo número do PI, ordenando da mais recente para a mais antiga.
+// É uma função pura (não um hook), então pode ser chamada após returns condicionais sem problema.
+function groupSubmissionsByPi(subs: Submission[]) {
+  const map: Record<string, Submission[]> = {};
+  subs.forEach((s) => {
+    if (!map[s.numeroPi]) map[s.numeroPi] = [];
+    map[s.numeroPi].push(s);
+  });
+  return Object.entries(map).map(([numeroPi, items]) => ({
+    numeroPi,
+    items: items.sort((a, b) => new Date(b.dataEnvio).getTime() - new Date(a.dataEnvio).getTime()),
+  }));
+}
+
+const PiGroupCard = ({ group, statusConfig, onSelectSubmission, onStatusUpdate }: {
+  group: { numeroPi: string; items: Submission[] };
+  statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock; className: string }>;
+  onSelectSubmission: (s: Submission) => void;
+  onStatusUpdate: (id: string, status: StatusDocumento) => void;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+  const hasMultiple = group.items.length > 1;
+  const latest = group.items[0];
+  const older = group.items.slice(1);
+  const cfg = statusConfig[latest.status];
+  const Icon = cfg.icon;
+
+  return (
+    <div className="bg-card rounded-xl border hover:shadow-lg hover:border-primary/30 transition-all overflow-hidden">
+      <button onClick={() => onSelectSubmission(latest)} className="w-full text-left p-5">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+              <FileText className="h-5 w-5 text-primary" />
             </div>
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{s.tipoVeiculo} • {s.cidade || "—"}</span>
-              <span>{new Date(s.dataEnvio).toLocaleDateString("pt-BR")}</span>
+            <div>
+              <h3 className="font-semibold text-foreground flex items-center gap-2">
+                PI {latest.numeroPi}
+                {hasMultiple && (
+                  <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200">
+                    {group.items.length}º envios
+                  </Badge>
+                )}
+              </h3>
+              <p className="text-sm text-muted-foreground">{latest.nomeVeiculo}</p>
             </div>
-            {s.status === "pendente" && (
-              <div className="flex gap-2 mt-3 pt-3 border-t">
-                <Button size="sm" variant="outline" className="text-xs h-7 flex-1"
-                  onClick={(e) => { e.stopPropagation(); onStatusUpdate(s.id, "corrigido"); }}>
-                  <CheckCircle2 className="h-3 w-3 mr-1" /> Corrigido
-                </Button>
-                <Button size="sm" variant="outline" className="text-xs h-7 flex-1 text-destructive"
-                  onClick={(e) => { e.stopPropagation(); onStatusUpdate(s.id, "rejeitado"); }}>
-                  <AlertCircle className="h-3 w-3 mr-1" /> Pendência
-                </Button>
-              </div>
-            )}
+          </div>
+          <Badge variant="outline" className={`text-xs ${cfg.className}`}>
+            <Icon className="h-3 w-3 mr-1" />{cfg.label}
+          </Badge>
+        </div>
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>{latest.tipoVeiculo} • {latest.cidade || "—"}</span>
+          <span>{new Date(latest.dataEnvio).toLocaleDateString("pt-BR")}</span>
+        </div>
+        {latest.status === "pendente" && (
+          <div className="flex gap-2 mt-3 pt-3 border-t">
+            <Button size="sm" variant="outline" className="text-xs h-7 flex-1"
+              onClick={(e) => { e.stopPropagation(); onStatusUpdate(latest.id, "corrigido"); }}>
+              <CheckCircle2 className="h-3 w-3 mr-1" /> Corrigido
+            </Button>
+            <Button size="sm" variant="outline" className="text-xs h-7 flex-1 text-destructive"
+              onClick={(e) => { e.stopPropagation(); onStatusUpdate(latest.id, "rejeitado"); }}>
+              <AlertCircle className="h-3 w-3 mr-1" /> Pendência
+            </Button>
+          </div>
+        )}
+      </button>
+
+      {hasMultiple && (
+        <div className="border-t bg-muted/20">
+          <button
+            onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+            className="w-full flex items-center gap-2 px-5 py-2.5 text-xs text-muted-foreground hover:bg-muted/40 transition-colors"
+          >
+            <ChevronRight className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-90" : ""}`} />
+            Ver {older.length} envio{older.length !== 1 ? "s" : ""} anterior{older.length !== 1 ? "es" : ""} deste PI
           </button>
-        );
-      })}
+          {expanded && (
+            <div className="px-5 pb-3 space-y-1.5">
+              {older.map((item) => {
+                const oldCfg = statusConfig[item.status];
+                const OldIcon = oldCfg.icon;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={(e) => { e.stopPropagation(); onSelectSubmission(item); }}
+                    className="w-full flex items-center justify-between gap-2 p-2.5 rounded-lg bg-card border text-left hover:border-primary/30 transition-colors"
+                  >
+                    <span className="text-xs text-muted-foreground">
+                      Envio de {new Date(item.dataEnvio).toLocaleDateString("pt-BR")}
+                    </span>
+                    <Badge variant="outline" className={`text-[10px] ${oldCfg.className}`}>
+                      <OldIcon className="h-2.5 w-2.5 mr-1" />{oldCfg.label}
+                    </Badge>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -430,3 +506,4 @@ const TreeCampanhaFolder = ({ campanha, submissions, onSelect, statusConfig }: {
 };
 
 export default OperadorDashboard;
+
