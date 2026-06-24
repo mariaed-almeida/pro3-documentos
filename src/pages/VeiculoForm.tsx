@@ -437,18 +437,18 @@ const VeiculoForm = () => {
           <div className="bg-card rounded-lg border p-6 animate-fade-in space-y-6">
             <h2 className="text-lg font-semibold text-foreground">Documentação</h2>
             <div className="space-y-4">
-              <section className="rounded-xl border bg-muted/20 p-5 space-y-3">
-                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  <Download className="h-4 w-4 text-primary" />
+              <section className="rounded-xl border-2 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 p-5 space-y-3">
+                <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300 flex items-center gap-2">
+                  <Download className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                   Modelos
                 </h3>
-                <p className="text-sm text-muted-foreground">Baixe primeiro os modelos de apoio para preenchimento, se necessário.</p>
+                <p className="text-sm text-blue-700 dark:text-blue-300">Baixe primeiro os modelos de apoio para preenchimento, se necessário.</p>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="text-xs gap-1.5 w-full sm:w-auto"
+                    className="text-xs gap-1.5 w-full sm:w-auto bg-white border-blue-300 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/40 dark:border-blue-700 dark:text-blue-200"
                     onClick={() => handleTemplateDownload("/modelos/Modelo_Declaracao_Art_299.pdf", "Modelo_Declaracao_Art_299.pdf")}
                   >
                     <Download className="h-3 w-3" /> Modelo - Declaração Art. 299
@@ -457,7 +457,7 @@ const VeiculoForm = () => {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="text-xs gap-1.5 w-full sm:w-auto"
+                    className="text-xs gap-1.5 w-full sm:w-auto bg-white border-blue-300 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/40 dark:border-blue-700 dark:text-blue-200"
                     onClick={() => handleTemplateDownload("/modelos/Modelo_Declaracao_Simples_Nacional.pdf", "Modelo_Declaracao_Simples_Nacional.pdf")}
                   >
                     <Download className="h-3 w-3" /> Modelo - Declaração Simples Nacional

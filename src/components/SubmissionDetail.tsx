@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, FileText, CheckCircle2, Clock, AlertCircle, Eye, User, Mail, Phone, ExternalLink, MapPin, Download, X, Loader2, Image as ImageIcon, Send, BadgeCheck, CircleDollarSign } from "lucide-react";
+import { ArrowLeft, FileText, CheckCircle2, Clock, AlertCircle, Eye, User, Mail, Phone, ExternalLink, MapPin, Download, X, Loader2, Image as ImageIcon, Send, BadgeCheck, CircleDollarSign, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -41,7 +41,8 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
   const cfg = statusConfig[submission.status];
   const StatusIcon = cfg.icon;
   const [documents, setDocuments] = useState<DbDocument[]>([]);
-  const [previewDoc, setPreviewDoc] = useState<DbDocument | null>(null);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const previewDoc = previewIndex !== null ? documents[previewIndex] : null;
   const [downloading, setDownloading] = useState(false);
   const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
 
@@ -70,6 +71,20 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
     };
     load();
   }, [submission.id]);
+
+  // Navegação por teclado entre documentos enquanto o preview está aberto
+  useEffect(() => {
+    if (previewIndex === null) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") {
+        setPreviewIndex((i) => (i !== null && i < documents.length - 1 ? i + 1 : i));
+      } else if (e.key === "ArrowLeft") {
+        setPreviewIndex((i) => (i !== null && i > 0 ? i - 1 : i));
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [previewIndex, documents.length]);
 
   const allStatuses: StatusDocumento[] = ["pendente", "em_analise", "corrigido", "rejeitado", "aprovado", "faturado"];
 
@@ -246,7 +261,7 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
           </div>
           {documents.length > 0 ? (
             <div className="space-y-2">
-              {documents.map((doc) => {
+              {documents.map((doc, index) => {
                 const previewable = isPreviewable(doc.file_name);
                 const docIsImage = isImage(doc.file_name);
                 const isDownloading = downloadingFile === doc.id;
@@ -264,7 +279,7 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
                     <div className="flex items-center gap-1 shrink-0">
                       {previewable && doc.signed_url && (
                         <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-primary gap-1"
-                          onClick={() => setPreviewDoc(doc)}>
+                          onClick={() => setPreviewIndex(index)}>
                           <Eye className="h-3 w-3" /> Visualizar
                         </Button>
                       )}
@@ -312,21 +327,43 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
       </div>
 
       {/* Preview Dialog */}
-      <Dialog open={!!previewDoc} onOpenChange={(open) => { if (!open) setPreviewDoc(null); }}>
+      <Dialog open={!!previewDoc} onOpenChange={(open) => { if (!open) setPreviewIndex(null); }}>
         <DialogContent className="max-w-4xl w-[95vw] h-[85vh] p-0 gap-0 overflow-hidden">
-          {previewDoc && (
+          {previewDoc && previewIndex !== null && (
             <div className="flex flex-col h-full">
-              <div className="flex items-center justify-between px-4 py-3 border-b bg-card">
-                <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between px-4 py-3 border-b bg-card gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => setPreviewIndex((i) => (i !== null && i > 0 ? i - 1 : i))}
+                  disabled={previewIndex === 0}
+                  title="Documento anterior (seta esquerda)"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="min-w-0 flex-1 text-center">
                   <p className="text-sm font-semibold text-foreground truncate">{previewDoc.doc_label}</p>
-                  <p className="text-xs text-muted-foreground truncate">{previewDoc.file_name}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {previewDoc.file_name} · {previewIndex + 1} de {documents.length}
+                  </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0 ml-4">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => setPreviewIndex((i) => (i !== null && i < documents.length - 1 ? i + 1 : i))}
+                  disabled={previewIndex === documents.length - 1}
+                  title="Próximo documento (seta direita)"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <div className="flex items-center gap-2 shrink-0 ml-2">
                   <Button variant="outline" size="sm" className="h-7 text-xs gap-1"
                     onClick={() => handleDownloadSingle(previewDoc)}>
                     <Download className="h-3 w-3" /> Baixar
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPreviewDoc(null)}>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPreviewIndex(null)}>
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
@@ -387,4 +424,3 @@ const InfoRow = ({ label, value }: { label: string; value: string }) => (
 );
 
 export default SubmissionDetail;
-
