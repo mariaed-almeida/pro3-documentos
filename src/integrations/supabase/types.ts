@@ -78,6 +78,7 @@ export type Database = {
       }
       submissions: {
         Row: {
+          analise_ia: Json | null
           campanha: string
           cidade: string
           cliente: string
@@ -96,6 +97,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          analise_ia?: Json | null
           campanha: string
           cidade?: string
           cliente: string
@@ -114,6 +116,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          analise_ia?: Json | null
           campanha?: string
           cidade?: string
           cliente?: string
