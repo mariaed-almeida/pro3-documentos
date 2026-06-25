@@ -93,6 +93,7 @@ export async function addSubmission(
     status: "pendente",
     observacoes: submission.observacoes || null,
     data_envio: dataEnvio,
+    analise_ia: null,
   };
 
   // Upload files and create document records
@@ -207,6 +208,7 @@ interface DbSubmission {
   status: string;
   observacoes: string | null;
   data_envio: string;
+  analise_ia: any | null;
 }
 
 interface DbDocument {
@@ -262,5 +264,6 @@ function mapDbToSubmission(sub: DbSubmission, docs: DbDocument[] = []): Submissi
     status: sub.status as StatusDocumento,
     dataEnvio: sub.data_envio,
     observacoes: sub.observacoes || undefined,
+    analiseIa: sub.analise_ia || undefined,
   };
 }
