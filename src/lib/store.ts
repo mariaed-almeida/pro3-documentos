@@ -93,6 +93,7 @@ export async function addSubmission(
     status: "pendente",
     observacoes: submission.observacoes || null,
     data_envio: dataEnvio,
+    analise_ia: null,
   };
 
   // Upload files and create document records
