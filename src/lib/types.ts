@@ -10,6 +10,17 @@ export interface DocumentoUpload {
   nomeArquivo?: string;
 }
 
+export interface AchadoAnaliseIa {
+  checagem: string;
+  resultado: "atencao" | "ok" | "nao_verificavel";
+  detalhe: string;
+}
+
+export interface AnaliseIa {
+  geradoEm: string;
+  achados: AchadoAnaliseIa[];
+}
+
 export interface Submission {
   id: string;
   cliente: Cliente;
@@ -36,6 +47,7 @@ export interface Submission {
   status: StatusDocumento;
   dataEnvio: string;
   observacoes?: string;
+  analiseIa?: AnaliseIa;
 }
 
 // Campaigns are now managed in the database via the "campanhas" table.
