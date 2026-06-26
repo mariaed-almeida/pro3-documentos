@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, FileText, CheckCircle2, Clock, AlertCircle, Eye, User, Mail, Phone, ExternalLink, MapPin, Download, X, Loader2, Image as ImageIcon, Send, BadgeCheck, CircleDollarSign, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, FileText, CheckCircle2, Clock, AlertCircle, Eye, User, Mail, Phone, ExternalLink, MapPin, Download, X, Loader2, Image as ImageIcon, Send, BadgeCheck, CircleDollarSign, ChevronLeft, ChevronRight, Sparkles, ShieldAlert, ShieldCheck, ShieldQuestion } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -50,6 +50,32 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectMessage, setRejectMessage] = useState("");
   const [sendingReject, setSendingReject] = useState(false);
+
+  // Pré-análise por IA
+  const [analisandoIa, setAnalisandoIa] = useState(false);
+  const [analiseIa, setAnaliseIa] = useState<typeof submission.analiseIa | null>(submission.analiseIa || null);
+  const [erroAnaliseIa, setErroAnaliseIa] = useState<string | null>(null);
+
+  const handleAnalisarComIa = async () => {
+    setAnalisandoIa(true);
+    setErroAnaliseIa(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("analisar-documentacao", {
+        body: { submissionId: submission.id },
+      });
+      if (error || !data?.success) {
+        throw new Error(data?.error || error?.message || "Falha ao analisar documentação");
+      }
+      setAnaliseIa(data.analise);
+      toast({ title: "Análise concluída", description: "Revise as sugestões da IA abaixo." });
+    } catch (err: any) {
+      console.error("Erro na análise de IA:", err);
+      setErroAnaliseIa(err.message || "Não foi possível concluir a análise.");
+      toast({ title: "Erro na análise", description: err.message, variant: "destructive" });
+    } finally {
+      setAnalisandoIa(false);
+    }
+  };
 
   useEffect(() => {
     const load = async () => {
