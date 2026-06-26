@@ -274,6 +274,55 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
           </div>
         </div>
 
+        {/* Pré-análise por IA */}
+        <div className="bg-card rounded-lg border p-5 space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold text-foreground">Pré-análise por IA</h3>
+            </div>
+            <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={handleAnalisarComIa} disabled={analisandoIa}>
+              {analisandoIa ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+              {analisandoIa ? "Analisando..." : analiseIa ? "Analisar novamente" : "Analisar com IA"}
+            </Button>
+          </div>
+
+          {!analiseIa && !analisandoIa && !erroAnaliseIa && (
+            <p className="text-sm text-muted-foreground">
+              Clique em "Analisar com IA" para verificar pontos objetivos da documentação (referências de contrato, validade de certidões, etc.). As sugestões são apenas apoio — a decisão final é do operador.
+            </p>
+          )}
+
+          {erroAnaliseIa && (
+            <p className="text-sm text-destructive">{erroAnaliseIa}</p>
+          )}
+
+          {analiseIa && (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Análise gerada em {new Date(analiseIa.geradoEm).toLocaleString("pt-BR")} — revise cada ponto antes de decidir.
+              </p>
+              {analiseIa.achados.map((achado, i) => {
+                const visual = achado.resultado === "atencao"
+                  ? { Icon: ShieldAlert, className: "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800", iconColor: "text-amber-600 dark:text-amber-400" }
+                  : achado.resultado === "ok"
+                  ? { Icon: ShieldCheck, className: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800", iconColor: "text-emerald-600 dark:text-emerald-400" }
+                  : { Icon: ShieldQuestion, className: "bg-muted border-muted-foreground/20", iconColor: "text-muted-foreground" };
+                const V = visual.Icon;
+                return (
+                  <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border ${visual.className}`}>
+                    <V className={`h-4 w-4 mt-0.5 shrink-0 ${visual.iconColor}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground">{achado.checagem}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{achado.detalhe}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         {/* Documents */}
         <div className="bg-card rounded-lg border p-5 space-y-4">
           <div className="flex items-center justify-between">
