@@ -87,6 +87,7 @@ export type Database = {
           contato_telefone: string
           created_at: string
           data_envio: string
+          documentos_completos: boolean | null
           id: string
           nome_veiculo: string
           numero_pi: string
@@ -106,6 +107,7 @@ export type Database = {
           contato_telefone: string
           created_at?: string
           data_envio?: string
+          documentos_completos?: boolean | null
           id?: string
           nome_veiculo: string
           numero_pi: string
@@ -125,6 +127,7 @@ export type Database = {
           contato_telefone?: string
           created_at?: string
           data_envio?: string
+          documentos_completos?: boolean | null
           id?: string
           nome_veiculo?: string
           numero_pi?: string
