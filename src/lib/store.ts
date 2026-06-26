@@ -93,7 +93,6 @@ export async function addSubmission(
     status: "pendente",
     observacoes: submission.observacoes || null,
     data_envio: dataEnvio,
-    analise_ia: null,
   };
 
   // Upload files and create document records
@@ -161,6 +160,18 @@ export async function addSubmission(
     }
   }
 
+  // Marca a submission como "documentos completos" — esse UPDATE é o gatilho para a IA
+  // analisar automaticamente a documentação (via Database Webhook).
+  const { error: completeError } = await supabase
+    .from("submissions")
+    .update({ documentos_completos: true })
+    .eq("id", submissionId);
+
+  if (completeError) {
+    console.error("Error marking submission as complete:", completeError);
+    // Não impedimos o envio só porque a flag de controle falhou, mas logamos o erro.
+  }
+
   return mapDbToSubmission(sub, docRecords.map((doc, index) => ({
     id: `${sub.id}-${index}`,
     submission_id: sub.id,
@@ -208,7 +219,6 @@ interface DbSubmission {
   status: string;
   observacoes: string | null;
   data_envio: string;
-  analise_ia: any | null;
 }
 
 interface DbDocument {
@@ -264,6 +274,5 @@ function mapDbToSubmission(sub: DbSubmission, docs: DbDocument[] = []): Submissi
     status: sub.status as StatusDocumento,
     dataEnvio: sub.data_envio,
     observacoes: sub.observacoes || undefined,
-    analiseIa: sub.analise_ia || undefined,
   };
 }
