@@ -1,12 +1,12 @@
 // Edge Function: analisar-documentacao
 //
-// Esta função é chamada SOMENTE quando o operador clica no botão "Analisar com IA"
-// na tela de detalhe de um PI. Ela nunca é disparada automaticamente.
+// Esta função pode ser chamada de duas formas:
+// 1) Pelo botão "Analisar com IA" no painel do operador (chamada manual, formato { submissionId })
+// 2) Automaticamente por um Database Webhook, quando submissions.documentos_completos
+//    passa para TRUE (formato do Supabase: { type, table, record, old_record })
 //
-// O que faz: busca os documentos anexados a uma submission, gera links temporários
-// de acesso, e pede para o modelo de IA (via Lovable AI Gateway) fazer 5 checagens
-// objetivas. O resultado é salvo na coluna "analise_ia" da tabela submissions e
-// devolvido para o frontend exibir como sugestão — nunca como decisão automática.
+// Em NENHUM dos dois casos a função toma decisões ou envia qualquer coisa — ela só
+// gera sugestões de revisão e salva no banco para o operador humano avaliar.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -32,7 +32,28 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { submissionId } = await req.json();
+    const body = await req.json();
+
+    // Aceita tanto o formato manual { submissionId } quanto o formato de webhook do Supabase
+    // ({ type: "UPDATE", table: "submissions", record: {...} }).
+    let submissionId: string | undefined;
+
+    if (body.submissionId) {
+      submissionId = body.submissionId;
+    } else if (body.record) {
+      // Só processa o webhook se a mudança foi exatamente documentos_completos passando para true
+      // (evita disparar a análise de novo em qualquer outro UPDATE da submission, como mudança de status).
+      const ficouCompleto = body.record.documentos_completos === true &&
+        body.old_record?.documentos_completos !== true;
+      if (!ficouCompleto) {
+        return new Response(
+          JSON.stringify({ skipped: true, reason: "Não é uma transição para documentos_completos=true" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      submissionId = body.record.id;
+    }
+
     if (!submissionId) {
       return new Response(
         JSON.stringify({ error: "submissionId é obrigatório" }),
@@ -52,8 +73,8 @@ Deno.serve(async (req) => {
     }
 
     // Usamos a service role aqui porque esta função roda no servidor (acionada pelo
-    // operador autenticado) e precisa ler dados/arquivos que o RLS normalmente
-    // restringiria para o público — isso é seguro porque só o operador chama esta função.
+    // operador autenticado, ou pelo próprio banco via webhook) e precisa ler dados/
+    // arquivos que o RLS normalmente restringiria para o público.
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const { data: submission, error: subError } = await supabase
@@ -107,8 +128,6 @@ Deno.serve(async (req) => {
     const referenciasContrato = REFERENCIAS_CONTRATO[submission.cliente] || [];
     const isXanxere = submission.cliente === "Prefeitura de Xanxerê";
 
-    // Montamos o conteúdo multimodal: um texto de instrução + os PDFs como anexos.
-    // O Lovable AI Gateway aceita PDFs via URL no formato de mensagem multimodal.
     const conteudoMensagem: any[] = [
       {
         type: "text",
@@ -173,7 +192,6 @@ Responda SOMENTE em JSON, no seguinte formato exato, sem nenhum texto antes ou d
 
     let achados;
     try {
-      // O modelo pode às vezes envolver o JSON em ```json — removemos isso por segurança.
       const limpo = textoResposta.replace(/```json\s*|```\s*/g, "").trim();
       achados = JSON.parse(limpo);
     } catch (parseErr) {
@@ -189,7 +207,6 @@ Responda SOMENTE em JSON, no seguinte formato exato, sem nenhum texto antes ou d
       ...achados,
     };
 
-    // Salvamos o resultado para o operador ver mesmo se recarregar a página depois.
     await supabase
       .from("submissions")
       .update({ analise_ia: analiseCompleta })
