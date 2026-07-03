@@ -69,6 +69,7 @@ export async function addSubmission(
       observacoes: submission.observacoes || null,
       status: "pendente",
       data_envio: dataEnvio,
+      documentos_completos: false,
     });
 
   if (error) {
@@ -93,6 +94,7 @@ export async function addSubmission(
     status: "pendente",
     observacoes: submission.observacoes || null,
     data_envio: dataEnvio,
+    analise_ia: null,
   };
 
   // Upload files and create document records
@@ -143,9 +145,6 @@ export async function addSubmission(
   }
 
   if (uploadErrors.length > 0) {
-    // Veículos sem login não podem apagar nem alterar o status da submission (regra de segurança).
-    // O PI fica registrado como "pendente" mesmo sem os arquivos que falharam, e o operador
-    // poderá identificar e tratar isso manualmente ao revisar o processo.
     throw new Error(`Falha ao enviar arquivos:\n${uploadErrors.join("\n")}`);
   }
 
@@ -160,16 +159,15 @@ export async function addSubmission(
     }
   }
 
-  // Marca a submission como "documentos completos" — esse UPDATE é o gatilho para a IA
-  // analisar automaticamente a documentação (via Database Webhook).
+  // Marcamos a submission como "documentos completos" — é essa mudança (UPDATE) que o
+  // Database Webhook escuta para disparar a pré-análise por IA automaticamente.
   const { error: completeError } = await supabase
     .from("submissions")
     .update({ documentos_completos: true })
-    .eq("id", submissionId);
+    .eq("id", sub.id);
 
   if (completeError) {
-    console.error("Error marking submission as complete:", completeError);
-    // Não impedimos o envio só porque a flag de controle falhou, mas logamos o erro.
+    console.error("Aviso: não foi possível marcar documentos_completos:", completeError);
   }
 
   return mapDbToSubmission(sub, docRecords.map((doc, index) => ({
@@ -219,6 +217,7 @@ interface DbSubmission {
   status: string;
   observacoes: string | null;
   data_envio: string;
+  analise_ia: any | null;
 }
 
 interface DbDocument {
@@ -274,5 +273,6 @@ function mapDbToSubmission(sub: DbSubmission, docs: DbDocument[] = []): Submissi
     status: sub.status as StatusDocumento,
     dataEnvio: sub.data_envio,
     observacoes: sub.observacoes || undefined,
+    analiseIa: sub.analise_ia || undefined,
   };
 }
