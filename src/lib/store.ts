@@ -123,11 +123,24 @@ export async function addSubmission(
     const safeName = sanitizePathSegment(standardizedName.replace(ext, "")) + ext;
     const storagePath = `${sanitizePathSegment(sub.cliente)}/${sanitizePathSegment(sub.campanha)}/${sanitizePathSegment(sub.numero_pi)}/${safeName}`;
 
+    // Inferimos o Content-Type pelo nome do arquivo quando o navegador não o fornece.
+    // Isso garante que o Storage salva com o tipo correto, necessário para a pré-análise por IA.
+    const inferContentType = (fileName: string, fallback: string): string => {
+      const lower = fileName.toLowerCase();
+      if (lower.endsWith(".pdf")) return "application/pdf";
+      if (lower.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      if (lower.endsWith(".doc")) return "application/msword";
+      if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+      if (lower.endsWith(".png")) return "image/png";
+      if (lower.endsWith(".xlsx")) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      return fallback || "application/octet-stream";
+    };
+
     const { error: uploadError } = await supabase.storage
       .from("documentos")
       .upload(storagePath, file, {
         upsert: false,
-        contentType: file.type || undefined,
+        contentType: inferContentType(file.name, file.type),
       });
 
     if (uploadError) {
