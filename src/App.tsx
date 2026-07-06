@@ -7,6 +7,7 @@ import Index from "./pages/Index.tsx";
 import VeiculoForm from "./pages/VeiculoForm.tsx";
 import OperadorDashboard from "./pages/OperadorDashboard.tsx";
 import OperadorLogin from "./pages/OperadorLogin.tsx";
+import OAuthConsent from "./pages/OAuthConsent.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/veiculo" element={<VeiculoForm />} />
           <Route path="/operador/login" element={<OperadorLogin />} />
           <Route path="/operador" element={<OperadorDashboard />} />
+          <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

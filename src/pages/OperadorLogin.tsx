@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Lock, LogIn, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,29 +10,43 @@ import logoPro3 from "@/assets/logo-pro3.png";
 
 const OperadorLogin = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
 
+  // Validate `next` as a same-origin relative path before using it.
+  const rawNext = searchParams.get("next");
+  const nextPath = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
+  const redirectTo = nextPath ?? "/operador";
+
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
-        navigate("/operador", { replace: true });
+        if (nextPath) {
+          window.location.href = nextPath;
+        } else {
+          navigate(redirectTo, { replace: true });
+        }
       }
       setCheckingSession(false);
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        navigate("/operador", { replace: true });
+        if (nextPath) {
+          window.location.href = nextPath;
+        } else {
+          navigate(redirectTo, { replace: true });
+        }
       }
       setCheckingSession(false);
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, nextPath, redirectTo]);
 
   const handleLogin = async () => {
     if (!email || !password) {
