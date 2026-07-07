@@ -36,7 +36,7 @@ const ORIENTACOES_CLIENTE: Record<Cliente, {
       "Empresas sujeitas à retenção: destacar IR à alíquota de 4,8%. Empresas isentas: descrever o artigo de isenção e apresentar declaração.",
       "Inclua os dados bancários no corpo da NF ou no campo de informações adicionais.",
     ],
-    enderecoPostal: "Av. Prefeito Osmar Cunha, 416, Sala 905 — Ed. Koerich — Florianópolis/SC — CEP 88.015-100",
+    enderecoPostal: "Av. Prefeito Osmar Cunha, 416, Sala 905 — Ed. Koerich Empresarial Rio Branco — Florianópolis/SC — CEP 88.015-100",
   },
   "Prefeitura de Chapecó": {
     cnpj: "83.021.808/0001-82",
