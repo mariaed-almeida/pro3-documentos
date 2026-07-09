@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Search, FolderOpen, FileText, ChevronRight,
   CheckCircle2, Clock, AlertCircle, Eye, Folder, LayoutGrid, List, LogOut, Loader2, Settings,
-  BadgeCheck, CircleDollarSign,
+  BadgeCheck, CircleDollarSign, ArrowUpDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,10 +24,13 @@ const statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock;
   faturado:    { label: "Faturado",   icon: CircleDollarSign,  className: "bg-violet-500/10 text-violet-600 border-violet-500/20" },
 };
 
+type OrdemOpcao = "recente" | "antigo" | "alfabetico";
+
 const OperadorDashboard = () => {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("todos");
+  const [ordem, setOrdem] = useState<OrdemOpcao>("recente");
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [viewMode, setViewMode] = useState<"cards" | "tree">("cards");
   const [selectedCliente, setSelectedCliente] = useState<string | null>(null);
@@ -174,6 +177,7 @@ const OperadorDashboard = () => {
           })}
         </div>
 
+        {/* Filtros: busca, status e ordenação */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -191,6 +195,20 @@ const OperadorDashboard = () => {
               <SelectItem value="faturado">Faturado</SelectItem>
             </SelectContent>
           </Select>
+          {/* Filtro de ordenação — só aparece quando estamos dentro de uma campanha (lista de PIs) */}
+          {selectedCampanha && (
+            <Select value={ordem} onValueChange={(v) => setOrdem(v as OrdemOpcao)}>
+              <SelectTrigger className="w-full sm:w-[220px] gap-1.5">
+                <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="recente">Mais recentes primeiro</SelectItem>
+                <SelectItem value="antigo">Mais antigos primeiro</SelectItem>
+                <SelectItem value="alfabetico">Ordem alfabética (veículo)</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         {viewMode === "cards" && (selectedCliente || selectedCampanha) && (
@@ -227,12 +245,12 @@ const OperadorDashboard = () => {
         ) : viewMode === "cards" ? (
           <CardView grouped={grouped} selectedCliente={selectedCliente} selectedCampanha={selectedCampanha}
             onSelectCliente={setSelectedCliente} onSelectCampanha={setSelectedCampanha}
-            onSelectSubmission={handleSelectSubmission} onStatusUpdate={handleStatusUpdate} statusConfig={statusConfig} />
+            onSelectSubmission={handleSelectSubmission} onStatusUpdate={handleStatusUpdate} statusConfig={statusConfig} ordem={ordem} />
         ) : (
           <div className="space-y-4">
             {Object.entries(grouped).map(([cliente, campanhas]) => (
               <TreeClienteFolder key={cliente} cliente={cliente} campanhas={campanhas}
-                onSelect={handleSelectSubmission} statusConfig={statusConfig} />
+                onSelect={handleSelectSubmission} statusConfig={statusConfig} ordem={ordem} />
             ))}
           </div>
         )}
@@ -245,7 +263,7 @@ const OperadorDashboard = () => {
 
 const CardView = ({
   grouped, selectedCliente, selectedCampanha,
-  onSelectCliente, onSelectCampanha, onSelectSubmission, onStatusUpdate, statusConfig,
+  onSelectCliente, onSelectCampanha, onSelectSubmission, onStatusUpdate, statusConfig, ordem,
 }: {
   grouped: Record<string, Record<string, Submission[]>>;
   selectedCliente: string | null;
@@ -255,6 +273,7 @@ const CardView = ({
   onSelectSubmission: (s: Submission) => void;
   onStatusUpdate: (id: string, status: StatusDocumento) => void;
   statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock; className: string }>;
+  ordem: OrdemOpcao;
 }) => {
   if (!selectedCliente) {
     return (
@@ -322,7 +341,7 @@ const CardView = ({
 
   // Agrupamos por número do PI: se o mesmo veículo reenviar o mesmo número de PI
   // (ex: depois de uma correção), tratamos como o mesmo processo, não como dois PIs soltos.
-  const subsByNumeroPi = groupSubmissionsByPi(subs);
+  const subsByNumeroPi = sortAndGroupSubmissions(subs, ordem);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -334,18 +353,33 @@ const CardView = ({
   );
 };
 
-// Agrupa as submissions de uma campanha pelo número do PI, ordenando da mais recente para a mais antiga.
-// É uma função pura (não um hook), então pode ser chamada após returns condicionais sem problema.
-function groupSubmissionsByPi(subs: Submission[]) {
+// Agrupa por número do PI e aplica a ordenação escolhida pelo operador.
+function sortAndGroupSubmissions(subs: Submission[], ordem: OrdemOpcao) {
   const map: Record<string, Submission[]> = {};
   subs.forEach((s) => {
     if (!map[s.numeroPi]) map[s.numeroPi] = [];
     map[s.numeroPi].push(s);
   });
-  return Object.entries(map).map(([numeroPi, items]) => ({
+
+  const groups = Object.entries(map).map(([numeroPi, items]) => ({
     numeroPi,
+    // Dentro de cada grupo, o envio mais recente sempre fica em primeiro (como "versão atual")
     items: items.sort((a, b) => new Date(b.dataEnvio).getTime() - new Date(a.dataEnvio).getTime()),
   }));
+
+  // Ordena os grupos entre si conforme a opção escolhida
+  return groups.sort((a, b) => {
+    const latestA = a.items[0];
+    const latestB = b.items[0];
+    if (ordem === "recente") {
+      return new Date(latestB.dataEnvio).getTime() - new Date(latestA.dataEnvio).getTime();
+    }
+    if (ordem === "antigo") {
+      return new Date(latestA.dataEnvio).getTime() - new Date(latestB.dataEnvio).getTime();
+    }
+    // alfabetico — por nome do veículo
+    return latestA.nomeVeiculo.localeCompare(latestB.nomeVeiculo, "pt-BR");
+  });
 }
 
 const PiGroupCard = ({ group, statusConfig, onSelectSubmission, onStatusUpdate }: {
@@ -442,10 +476,11 @@ const PiGroupCard = ({ group, statusConfig, onSelectSubmission, onStatusUpdate }
 
 /* ============ TREE VIEW ============ */
 
-const TreeClienteFolder = ({ cliente, campanhas, onSelect, statusConfig }: {
+const TreeClienteFolder = ({ cliente, campanhas, onSelect, statusConfig, ordem }: {
   cliente: string; campanhas: Record<string, Submission[]>;
   onSelect: (s: Submission) => void;
   statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock; className: string }>;
+  ordem: OrdemOpcao;
 }) => {
   const [open, setOpen] = useState(true);
   return (
@@ -459,7 +494,7 @@ const TreeClienteFolder = ({ cliente, campanhas, onSelect, statusConfig }: {
       {open && (
         <div className="border-t">
           {Object.entries(campanhas).map(([campanha, subs]) => (
-            <TreeCampanhaFolder key={campanha} campanha={campanha} submissions={subs} onSelect={onSelect} statusConfig={statusConfig} />
+            <TreeCampanhaFolder key={campanha} campanha={campanha} submissions={subs} onSelect={onSelect} statusConfig={statusConfig} ordem={ordem} />
           ))}
         </div>
       )}
@@ -467,12 +502,20 @@ const TreeClienteFolder = ({ cliente, campanhas, onSelect, statusConfig }: {
   );
 };
 
-const TreeCampanhaFolder = ({ campanha, submissions, onSelect, statusConfig }: {
+const TreeCampanhaFolder = ({ campanha, submissions, onSelect, statusConfig, ordem }: {
   campanha: string; submissions: Submission[];
   onSelect: (s: Submission) => void;
   statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock; className: string }>;
+  ordem: OrdemOpcao;
 }) => {
   const [open, setOpen] = useState(true);
+
+  const sorted = [...submissions].sort((a, b) => {
+    if (ordem === "recente") return new Date(b.dataEnvio).getTime() - new Date(a.dataEnvio).getTime();
+    if (ordem === "antigo") return new Date(a.dataEnvio).getTime() - new Date(b.dataEnvio).getTime();
+    return a.nomeVeiculo.localeCompare(b.nomeVeiculo, "pt-BR");
+  });
+
   return (
     <div>
       <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-3 px-4 py-3 pl-10 hover:bg-muted/30 transition-colors">
@@ -482,7 +525,7 @@ const TreeCampanhaFolder = ({ campanha, submissions, onSelect, statusConfig }: {
       </button>
       {open && (
         <div className="pl-14 pr-4 pb-2 space-y-1">
-          {submissions.map((s) => {
+          {sorted.map((s) => {
             const cfg = statusConfig[s.status];
             const Icon = cfg.icon;
             return (
@@ -506,4 +549,3 @@ const TreeCampanhaFolder = ({ campanha, submissions, onSelect, statusConfig }: {
 };
 
 export default OperadorDashboard;
-
