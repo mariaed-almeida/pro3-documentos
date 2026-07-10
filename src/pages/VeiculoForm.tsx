@@ -216,7 +216,7 @@ const VeiculoForm = () => {
     catch { toast({ title: "Erro ao baixar modelo", description: "Tente novamente em instantes.", variant: "destructive" }); }
   };
 
-  if (showReceipt && submittedData) return <SubmissionReceipt submission={submittedData} onClose={() => navigate("/")} />;
+  if (showReceipt && submittedData) return <SubmissionReceipt submission={submittedData} />;
 
   return (
     <div className="min-h-screen bg-background">
