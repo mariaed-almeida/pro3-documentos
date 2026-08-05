@@ -1,0 +1,1 @@
+GRANT UPDATE (documentos_completos) ON public.submissions TO anon;
