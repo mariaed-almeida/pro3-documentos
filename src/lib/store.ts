@@ -174,13 +174,16 @@ export async function addSubmission(
 
   // Marcamos a submission como "documentos completos" — é essa mudança (UPDATE) que o
   // Database Webhook escuta para disparar a pré-análise por IA automaticamente.
-  const { error: completeError } = await supabase
+  const { error: completeError, data: completeData } = await supabase
     .from("submissions")
     .update({ documentos_completos: true })
-    .eq("id", sub.id);
+    .eq("id", sub.id)
+    .select("id, documentos_completos");
 
   if (completeError) {
-    console.error("Aviso: não foi possível marcar documentos_completos:", completeError);
+    console.error("ERRO ao marcar documentos_completos:", JSON.stringify(completeError));
+  } else {
+    console.log("documentos_completos atualizado:", JSON.stringify(completeData));
   }
 
   return mapDbToSubmission(sub, docRecords.map((doc, index) => ({
