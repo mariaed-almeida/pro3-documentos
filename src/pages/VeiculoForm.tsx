@@ -84,7 +84,7 @@ const VeiculoForm = () => {
   const [contatoEmail, setContatoEmail] = useState("");
   const [contatoTelefone, setContatoTelefone] = useState("");
   const [observacoes, setObservacoes] = useState("");
-  const [simplesNacional, setSimplesNacional] = useState(false);
+  const [simplesNacional, setSimplesNacional] = useState(true);
   const [cndsAgrupadas, setCndsAgrupadas] = useState(false);
 
   const [docs, setDocs] = useState<Record<string, File[]>>({
@@ -146,7 +146,7 @@ const VeiculoForm = () => {
     { key: "notaFiscal", label: "Nota Fiscal", required: true, desc: "Nota Fiscal referente ao serviço prestado" },
     { key: "declaracaoArtigo299", label: "Declaração do Artigo 299", required: true, desc: "Declaração conforme Art. 299 do Código Penal" },
     { key: "tabelaPrecoAssinada", label: "Tabela de Preço Assinada", required: true, desc: "Tabela de preços do veículo assinada" },
-    ...(simplesNacional ? [{ key: "declaracaoSimplesNacional", label: "Declaração de Optante pelo Simples Nacional", required: true, desc: "Documento comprovatório de dispensa de retenção do IRRF" }] : []),
+    ...(!simplesNacional ? [{ key: "declaracaoSimplesNacional", label: "Declaração de Optante pelo Simples Nacional", required: true, desc: "Documento comprovatório de dispensa de retenção do IRRF" }] : []),
     ...(!isMidiaExterna ? [{ key: "comprovantesExibicao", label: "Comprovantes de Exibição", required: true, desc: "Comprovantes de veiculação da campanha (prints, declarações, comprovantes assinados)" }] : []),
     ...(isJornal ? [{ key: "notaFiscalGrafica", label: "Nota Fiscal da Gráfica", required: true, desc: "NF da gráfica comprovando a tiragem do jornal" }] : []),
     ...(isMidiaExterna ? [{ key: "fotoMidiaExterna", label: "Foto do Ponto de Exibição", required: true, desc: "Foto do outdoor/painel no local de veiculação" }] : []),
@@ -404,19 +404,22 @@ const VeiculoForm = () => {
 
                 <div
                   className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
-                    simplesNacional ? "border-primary bg-primary/5" : "border-muted bg-muted/20 hover:border-muted-foreground/30"
+                    !simplesNacional
+                      ? "border-destructive bg-destructive/5"
+                      : "border-muted bg-muted/20 hover:border-muted-foreground/30"
                   }`}
                   onClick={() => setSimplesNacional((prev) => !prev)}
                 >
                   <div className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-                    simplesNacional ? "border-primary bg-primary" : "border-muted-foreground/50 bg-background"
+                    !simplesNacional ? "border-destructive bg-destructive" : "border-muted-foreground/50 bg-background"
                   }`}>
-                    {simplesNacional && <CheckCircle2 className="h-3.5 w-3.5 text-primary-foreground" />}
+                    {!simplesNacional && <CheckCircle2 className="h-3.5 w-3.5 text-white" />}
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-foreground">Nossa empresa é optante pelo Simples Nacional</p>
+                    <p className="text-sm font-medium text-foreground">Nossa empresa <strong>não</strong> é optante pelo Simples Nacional</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Ao marcar esta opção, a <strong>Declaração de Optante pelo Simples Nacional</strong> se torna obrigatória e você deverá anexá-la abaixo.
+                      Marque esta opção apenas se sua empresa <strong>não</strong> for optante pelo Simples Nacional.
+                      Caso contrário, deixe desmarcado — a <strong>Declaração de Optante pelo Simples Nacional</strong> já será exigida automaticamente.
                     </p>
                   </div>
                 </div>
