@@ -149,6 +149,8 @@ Faça as seguintes checagens objetivas, e APENAS estas:
 3. As Certidões Negativas têm data de validade visível? Alguma já está vencida (considerando a data de hoje: ${new Date().toISOString().split("T")[0]})?
 4. Algum arquivo parece estar no tipo de documento errado (ex: um boleto ou recibo anexado como Nota Fiscal)?
 ${isXanxere ? "5. O texto obrigatório de Xanxerê aparece literalmente na Nota Fiscal?" : ""}
+6. Se houver um documento do tipo "declaracaoArtigo299" (Declaração Art. 299), verifique se ele segue a estrutura esperada: deve conter a expressão "art. n° 299 do Código Penal Brasileiro", deve mencionar o nome da empresa declarante, deve mencionar o período de veiculação, deve mencionar o número do Pedido de Inserção (PI), e deve ter espaço para assinatura ou assinatura digital. Se algum desses elementos estiver ausente, sinalize como atenção.
+7. Se houver um documento do tipo "declaracaoSimplesNacional" (Declaração Simples Nacional), verifique se ele segue a estrutura esperada: deve mencionar "Simples Nacional", deve fazer referência à Lei Complementar nº 123, deve mencionar o CNPJ da empresa declarante, e deve ter espaço para assinatura. Se algum desses elementos estiver ausente, sinalize como atenção.
 
 Responda SOMENTE em JSON, no seguinte formato exato, sem nenhum texto antes ou depois:
 {
