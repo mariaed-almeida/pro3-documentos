@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Search, FolderOpen, FileText, ChevronRight,
   CheckCircle2, Clock, AlertCircle, Eye, Folder, LayoutGrid, List, LogOut, Loader2, Settings,
-  BadgeCheck, CircleDollarSign, ArrowUpDown,
+  BadgeCheck, CircleDollarSign, ArrowUpDown, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
