@@ -307,8 +307,8 @@ const CardView = ({
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {Object.entries(campanhas).map(([campanha, subs]) => {
-          const pendentes = subs.filter(s => s.status === "pendente").length;
-          const corrigidos = subs.filter(s => s.status === "corrigido").length;
+          const recebidos = subs.filter(s => s.status === "recebido").length;
+          const emRevisao = subs.filter(s => s.status === "em_revisao").length;
           return (
             <button key={campanha} onClick={() => onSelectCampanha(campanha)}
               className="bg-card rounded-xl border p-6 hover:shadow-lg hover:border-primary/30 transition-all text-left group">
@@ -320,8 +320,8 @@ const CardView = ({
                   <h3 className="font-semibold text-foreground">{campanha}</h3>
                   <p className="text-sm text-muted-foreground mt-1">{subs.length} PI(s)</p>
                   <div className="flex gap-2 mt-2">
-                    {corrigidos > 0 && <Badge variant="outline" className="bg-success/10 text-success border-success/20 text-xs"><CheckCircle2 className="h-3 w-3 mr-1" />{corrigidos}</Badge>}
-                    {pendentes > 0 && <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20 text-xs"><Clock className="h-3 w-3 mr-1" />{pendentes}</Badge>}
+                    {emRevisao > 0 && <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs"><AlertCircle className="h-3 w-3 mr-1" />{emRevisao}</Badge>}
+                    {recebidos > 0 && <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs"><Clock className="h-3 w-3 mr-1" />{recebidos}</Badge>}
                   </div>
                 </div>
                 <ChevronRight className="h-5 w-5 text-muted-foreground mt-1" />
