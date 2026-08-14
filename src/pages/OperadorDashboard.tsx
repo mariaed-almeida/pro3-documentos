@@ -185,12 +185,10 @@ const OperadorDashboard = () => {
             <SelectTrigger className="w-full sm:w-[180px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os status</SelectItem>
-              <SelectItem value="pendente">Pendente</SelectItem>
-              <SelectItem value="em_analise">Em Análise</SelectItem>
-              <SelectItem value="corrigido">Corrigido</SelectItem>
-              <SelectItem value="rejeitado">Rejeitado</SelectItem>
+              <SelectItem value="recebido">Recebido</SelectItem>
+              <SelectItem value="em_revisao">Em revisão</SelectItem>
               <SelectItem value="aprovado">Aprovado</SelectItem>
-              <SelectItem value="faturado">Faturado</SelectItem>
+              <SelectItem value="cancelado">Cancelado</SelectItem>
             </SelectContent>
           </Select>
           {/* Filtro de ordenação — só aparece quando estamos dentro de uma campanha (lista de PIs) */}
