@@ -419,14 +419,14 @@ const PiGroupCard = ({ group, statusConfig, onSelectSubmission, onStatusUpdate }
           <span>{latest.tipoVeiculo} • {latest.cidade || "—"}</span>
           <span>{new Date(latest.dataEnvio).toLocaleDateString("pt-BR")}</span>
         </div>
-        {latest.status === "pendente" && (
+        {latest.status === "recebido" && (
           <div className="flex gap-2 mt-3 pt-3 border-t">
-            <Button size="sm" variant="outline" className="text-xs h-7 flex-1"
-              onClick={(e) => { e.stopPropagation(); onStatusUpdate(latest.id, "corrigido"); }}>
-              <CheckCircle2 className="h-3 w-3 mr-1" /> Corrigido
+            <Button size="sm" variant="outline" className="text-xs h-7 flex-1 text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+              onClick={(e) => { e.stopPropagation(); onStatusUpdate(latest.id, "aprovado"); }}>
+              <CheckCircle2 className="h-3 w-3 mr-1" /> Aprovar
             </Button>
-            <Button size="sm" variant="outline" className="text-xs h-7 flex-1 text-destructive"
-              onClick={(e) => { e.stopPropagation(); onStatusUpdate(latest.id, "rejeitado"); }}>
+            <Button size="sm" variant="outline" className="text-xs h-7 flex-1 text-amber-700 border-amber-200 hover:bg-amber-50"
+              onClick={(e) => { e.stopPropagation(); onStatusUpdate(latest.id, "em_revisao"); }}>
               <AlertCircle className="h-3 w-3 mr-1" /> Pendência
             </Button>
           </div>
