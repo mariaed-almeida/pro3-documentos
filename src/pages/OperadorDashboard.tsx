@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Search, FolderOpen, FileText, ChevronRight,
   CheckCircle2, Clock, AlertCircle, Eye, Folder, LayoutGrid, List, LogOut, Loader2, Settings,
-  BadgeCheck, CircleDollarSign, ArrowUpDown,
+  BadgeCheck, CircleDollarSign, ArrowUpDown, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,13 +15,11 @@ import SubmissionDetail from "@/components/SubmissionDetail";
 import CampanhasManager from "@/pages/CampanhasManager";
 import { supabase } from "@/integrations/supabase/client";
 
-const statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock; className: string }> = {
-  pendente:    { label: "Pendente",    icon: Clock,             className: "bg-warning/10 text-warning border-warning/20" },
-  em_analise:  { label: "Em Análise", icon: Eye,               className: "bg-primary/10 text-primary border-primary/20" },
-  corrigido:   { label: "Corrigido",  icon: CheckCircle2,      className: "bg-success/10 text-success border-success/20" },
-  rejeitado:   { label: "Rejeitado",  icon: AlertCircle,       className: "bg-destructive/10 text-destructive border-destructive/20" },
-  aprovado:    { label: "Aprovado",   icon: BadgeCheck,        className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" },
-  faturado:    { label: "Faturado",   icon: CircleDollarSign,  className: "bg-violet-500/10 text-violet-600 border-violet-500/20" },
+const statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock; className: string; description: string }> = {
+  recebido:    { label: "Recebido",    icon: Clock,          className: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800",    description: "Aguardando análise" },
+  em_revisao:  { label: "Em revisão", icon: AlertCircle,    className: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800", description: "Pendência identificada" },
+  aprovado:    { label: "Aprovado",   icon: CheckCircle2,   className: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800", description: "Pronto para o financeiro" },
+  cancelado:   { label: "Cancelado",  icon: X,              className: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-800",          description: "PI cancelado" },
 };
 
 type OrdemOpcao = "recente" | "antigo" | "alfabetico";
@@ -160,8 +158,8 @@ const OperadorDashboard = () => {
       </header>
 
       <div className="max-w-6xl mx-auto px-6 py-6 space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {(["pendente", "em_analise", "corrigido", "rejeitado", "aprovado", "faturado"] as StatusDocumento[]).map((st) => {
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {(["recebido", "em_revisao", "aprovado", "cancelado"] as StatusDocumento[]).map((st) => {
             const cfg = statusConfig[st];
             const count = submissions.filter((s) => s.status === st).length;
             const Icon = cfg.icon;
@@ -187,12 +185,10 @@ const OperadorDashboard = () => {
             <SelectTrigger className="w-full sm:w-[180px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os status</SelectItem>
-              <SelectItem value="pendente">Pendente</SelectItem>
-              <SelectItem value="em_analise">Em Análise</SelectItem>
-              <SelectItem value="corrigido">Corrigido</SelectItem>
-              <SelectItem value="rejeitado">Rejeitado</SelectItem>
+              <SelectItem value="recebido">Recebido</SelectItem>
+              <SelectItem value="em_revisao">Em revisão</SelectItem>
               <SelectItem value="aprovado">Aprovado</SelectItem>
-              <SelectItem value="faturado">Faturado</SelectItem>
+              <SelectItem value="cancelado">Cancelado</SelectItem>
             </SelectContent>
           </Select>
           {/* Filtro de ordenação — só aparece quando estamos dentro de uma campanha (lista de PIs) */}
@@ -280,7 +276,7 @@ const CardView = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {Object.entries(grouped).map(([cliente, campanhas]) => {
           const total = Object.values(campanhas).flat().length;
-          const pendentes = Object.values(campanhas).flat().filter(s => s.status === "pendente").length;
+          const recebidos = Object.values(campanhas).flat().filter(s => s.status === "recebido").length;
           return (
             <button key={cliente} onClick={() => onSelectCliente(cliente)}
               className="bg-card rounded-xl border p-6 hover:shadow-lg hover:border-primary/30 transition-all text-left group">
@@ -291,9 +287,9 @@ const CardView = ({
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-foreground text-lg">{cliente}</h3>
                   <p className="text-sm text-muted-foreground mt-1">{Object.keys(campanhas).length} campanha(s) • {total} PI(s)</p>
-                  {pendentes > 0 && (
-                    <Badge variant="outline" className="mt-2 bg-warning/10 text-warning border-warning/20 text-xs">
-                      {pendentes} pendente{pendentes !== 1 ? "s" : ""}
+                  {recebidos > 0 && (
+                    <Badge variant="outline" className="mt-2 bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                      {recebidos} recebido{recebidos !== 1 ? "s" : ""}
                     </Badge>
                   )}
                 </div>
@@ -311,8 +307,8 @@ const CardView = ({
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {Object.entries(campanhas).map(([campanha, subs]) => {
-          const pendentes = subs.filter(s => s.status === "pendente").length;
-          const corrigidos = subs.filter(s => s.status === "corrigido").length;
+          const recebidos = subs.filter(s => s.status === "recebido").length;
+          const emRevisao = subs.filter(s => s.status === "em_revisao").length;
           return (
             <button key={campanha} onClick={() => onSelectCampanha(campanha)}
               className="bg-card rounded-xl border p-6 hover:shadow-lg hover:border-primary/30 transition-all text-left group">
@@ -324,8 +320,8 @@ const CardView = ({
                   <h3 className="font-semibold text-foreground">{campanha}</h3>
                   <p className="text-sm text-muted-foreground mt-1">{subs.length} PI(s)</p>
                   <div className="flex gap-2 mt-2">
-                    {corrigidos > 0 && <Badge variant="outline" className="bg-success/10 text-success border-success/20 text-xs"><CheckCircle2 className="h-3 w-3 mr-1" />{corrigidos}</Badge>}
-                    {pendentes > 0 && <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20 text-xs"><Clock className="h-3 w-3 mr-1" />{pendentes}</Badge>}
+                    {emRevisao > 0 && <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs"><AlertCircle className="h-3 w-3 mr-1" />{emRevisao}</Badge>}
+                    {recebidos > 0 && <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs"><Clock className="h-3 w-3 mr-1" />{recebidos}</Badge>}
                   </div>
                 </div>
                 <ChevronRight className="h-5 w-5 text-muted-foreground mt-1" />
@@ -423,14 +419,14 @@ const PiGroupCard = ({ group, statusConfig, onSelectSubmission, onStatusUpdate }
           <span>{latest.tipoVeiculo} • {latest.cidade || "—"}</span>
           <span>{new Date(latest.dataEnvio).toLocaleDateString("pt-BR")}</span>
         </div>
-        {latest.status === "pendente" && (
+        {latest.status === "recebido" && (
           <div className="flex gap-2 mt-3 pt-3 border-t">
-            <Button size="sm" variant="outline" className="text-xs h-7 flex-1"
-              onClick={(e) => { e.stopPropagation(); onStatusUpdate(latest.id, "corrigido"); }}>
-              <CheckCircle2 className="h-3 w-3 mr-1" /> Corrigido
+            <Button size="sm" variant="outline" className="text-xs h-7 flex-1 text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+              onClick={(e) => { e.stopPropagation(); onStatusUpdate(latest.id, "aprovado"); }}>
+              <CheckCircle2 className="h-3 w-3 mr-1" /> Aprovar
             </Button>
-            <Button size="sm" variant="outline" className="text-xs h-7 flex-1 text-destructive"
-              onClick={(e) => { e.stopPropagation(); onStatusUpdate(latest.id, "rejeitado"); }}>
+            <Button size="sm" variant="outline" className="text-xs h-7 flex-1 text-amber-700 border-amber-200 hover:bg-amber-50"
+              onClick={(e) => { e.stopPropagation(); onStatusUpdate(latest.id, "em_revisao"); }}>
               <AlertCircle className="h-3 w-3 mr-1" /> Pendência
             </Button>
           </div>
