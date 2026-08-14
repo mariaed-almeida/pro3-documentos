@@ -276,7 +276,7 @@ const CardView = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {Object.entries(grouped).map(([cliente, campanhas]) => {
           const total = Object.values(campanhas).flat().length;
-          const pendentes = Object.values(campanhas).flat().filter(s => s.status === "pendente").length;
+          const recebidos = Object.values(campanhas).flat().filter(s => s.status === "recebido").length;
           return (
             <button key={cliente} onClick={() => onSelectCliente(cliente)}
               className="bg-card rounded-xl border p-6 hover:shadow-lg hover:border-primary/30 transition-all text-left group">
