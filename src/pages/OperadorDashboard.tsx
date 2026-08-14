@@ -287,9 +287,9 @@ const CardView = ({
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-foreground text-lg">{cliente}</h3>
                   <p className="text-sm text-muted-foreground mt-1">{Object.keys(campanhas).length} campanha(s) • {total} PI(s)</p>
-                  {pendentes > 0 && (
-                    <Badge variant="outline" className="mt-2 bg-warning/10 text-warning border-warning/20 text-xs">
-                      {pendentes} pendente{pendentes !== 1 ? "s" : ""}
+                  {recebidos > 0 && (
+                    <Badge variant="outline" className="mt-2 bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                      {recebidos} recebido{recebidos !== 1 ? "s" : ""}
                     </Badge>
                   )}
                 </div>
