@@ -13,12 +13,10 @@ import { saveAs } from "file-saver";
 import { downloadFileFromUrl, openFileFromUrl } from "@/lib/file-download";
 
 const statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock; className: string }> = {
-  pendente:    { label: "Pendente",    icon: Clock,               className: "bg-warning/10 text-warning border-warning/20" },
-  em_analise:  { label: "Em Análise", icon: Eye,                 className: "bg-primary/10 text-primary border-primary/20" },
-  corrigido:   { label: "Corrigido",  icon: CheckCircle2,        className: "bg-success/10 text-success border-success/20" },
-  rejeitado:   { label: "Rejeitado",  icon: AlertCircle,         className: "bg-destructive/10 text-destructive border-destructive/20" },
-  aprovado:    { label: "Aprovado",   icon: BadgeCheck,          className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" },
-  faturado:    { label: "Faturado",   icon: CircleDollarSign,    className: "bg-violet-500/10 text-violet-600 border-violet-500/20" },
+  recebido:   { label: "Recebido",    icon: Clock,        className: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800" },
+  em_revisao: { label: "Em revisão", icon: AlertCircle,  className: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800" },
+  aprovado:   { label: "Aprovado",   icon: CheckCircle2, className: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800" },
+  cancelado:  { label: "Cancelado",  icon: X,            className: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-800" },
 };
 
 interface DbDocument {
@@ -112,7 +110,7 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [previewIndex, documents.length]);
 
-  const allStatuses: StatusDocumento[] = ["pendente", "em_analise", "corrigido", "rejeitado", "aprovado", "faturado"];
+  const allStatuses: StatusDocumento[] = ["recebido", "em_revisao", "aprovado", "cancelado"];
 
   const getFileExtension = (name: string) => name.split(".").pop()?.toLowerCase() || "";
   const isImage = (name: string) => ["jpg", "jpeg", "png", "webp", "gif"].includes(getFileExtension(name));
@@ -172,7 +170,7 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
   };
 
   const handleStatusClick = (st: StatusDocumento) => {
-    if (st === "rejeitado") {
+    if (st === "em_revisao") {
       setShowRejectModal(true);
     } else {
       onStatusUpdate(submission.id, st);
@@ -187,7 +185,7 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
     setSendingReject(true);
     try {
       // Update status
-      onStatusUpdate(submission.id, "rejeitado");
+      onStatusUpdate(submission.id, "em_revisao");
 
       // Save observation
       await supabase
@@ -461,7 +459,7 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-destructive" />
-              Rejeitar Documentação — PI {submission.numeroPi}
+              Solicitar revisão — PI {submission.numeroPi}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -482,7 +480,7 @@ const SubmissionDetail = ({ submission, onBack, onStatusUpdate }: Props) => {
             <Button variant="outline" onClick={() => setShowRejectModal(false)}>Cancelar</Button>
             <Button variant="destructive" onClick={handleRejectConfirm} disabled={sendingReject} className="gap-1.5">
               {sendingReject ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              {sendingReject ? "Enviando..." : "Rejeitar e Notificar"}
+              {sendingReject ? "Enviando..." : "Solicitar revisão e notificar"}
             </Button>
           </DialogFooter>
         </DialogContent>
