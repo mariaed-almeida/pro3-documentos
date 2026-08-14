@@ -15,13 +15,11 @@ import SubmissionDetail from "@/components/SubmissionDetail";
 import CampanhasManager from "@/pages/CampanhasManager";
 import { supabase } from "@/integrations/supabase/client";
 
-const statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock; className: string }> = {
-  pendente:    { label: "Pendente",    icon: Clock,             className: "bg-warning/10 text-warning border-warning/20" },
-  em_analise:  { label: "Em Análise", icon: Eye,               className: "bg-primary/10 text-primary border-primary/20" },
-  corrigido:   { label: "Corrigido",  icon: CheckCircle2,      className: "bg-success/10 text-success border-success/20" },
-  rejeitado:   { label: "Rejeitado",  icon: AlertCircle,       className: "bg-destructive/10 text-destructive border-destructive/20" },
-  aprovado:    { label: "Aprovado",   icon: BadgeCheck,        className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" },
-  faturado:    { label: "Faturado",   icon: CircleDollarSign,  className: "bg-violet-500/10 text-violet-600 border-violet-500/20" },
+const statusConfig: Record<StatusDocumento, { label: string; icon: typeof Clock; className: string; description: string }> = {
+  recebido:    { label: "Recebido",    icon: Clock,          className: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800",    description: "Aguardando análise" },
+  em_revisao:  { label: "Em revisão", icon: AlertCircle,    className: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800", description: "Pendência identificada" },
+  aprovado:    { label: "Aprovado",   icon: CheckCircle2,   className: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800", description: "Pronto para o financeiro" },
+  cancelado:   { label: "Cancelado",  icon: X,              className: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-800",          description: "PI cancelado" },
 };
 
 type OrdemOpcao = "recente" | "antigo" | "alfabetico";
