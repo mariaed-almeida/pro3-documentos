@@ -2,13 +2,12 @@ export type Cliente = "ALESC" | "Prefeitura de Xanxerê" | "Prefeitura de Chapec
 
 export type TipoVeiculo = "Jornal" | "Rádio" | "Televisão" | "Portal" | "Mídia Externa" | "Outro";
 
-export type StatusDocumento = "pendente" | "em_analise" | "corrigido" | "rejeitado" | "aprovado" | "faturado";
-
-export interface DocumentoUpload {
-  nome: string;
-  arquivo: File | null;
-  nomeArquivo?: string;
-}
+// 4 status que refletem o fluxo real de trabalho da Pro3:
+// recebido    → PI chegou, aguardando análise do operador
+// em_revisao  → operador identificou pendência, veículo precisa corrigir e reenviar
+// aprovado    → documentação correta, pronta para o setor financeiro
+// cancelado   → PI cancelado por qualquer motivo (casos extremos)
+export type StatusDocumento = "recebido" | "em_revisao" | "aprovado" | "cancelado";
 
 export interface AchadoAnaliseIa {
   checagem: string;
@@ -50,10 +49,6 @@ export interface Submission {
   analiseIa?: AnaliseIa;
 }
 
-// Campaigns are now managed in the database via the "campanhas" table.
-// Use getActiveCampaigns() from "@/lib/campaigns" to fetch them.
-
-// Maps doc keys to human-readable type labels for file naming
 export const DOC_TYPE_LABELS: Record<string, string> = {
   piAssinado: "PI Assinado",
   notaFiscal: "Nota Fiscal",
@@ -68,15 +63,18 @@ export const DOC_TYPE_LABELS: Record<string, string> = {
   certidao3: "CND Tributos Federais",
   certidao4: "CRF FGTS",
   certidao5: "CND Debitos Trabalhistas",
+  certidoesAgrupadas: "Certidoes Negativas",
 };
 
 export function formatFileName(
   numeroPi: string,
   nomeVeiculo: string,
   cidade: string,
-  docTypeKey: string,
-  originalExtension: string
+  docType: string,
+  extension: string
 ): string {
-  const tipoLabel = DOC_TYPE_LABELS[docTypeKey] || docTypeKey;
-  return `PI ${numeroPi} - ${nomeVeiculo} - ${cidade} - ${tipoLabel}${originalExtension}`;
+  const label = DOC_TYPE_LABELS[docType] || docType;
+  const sanitize = (s: string) =>
+    s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9 ]/g, "").trim();
+  return `PI ${sanitize(numeroPi)} - ${sanitize(nomeVeiculo)} - ${sanitize(cidade)} - ${sanitize(label)}${extension}`;
 }
