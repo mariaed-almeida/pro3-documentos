@@ -158,8 +158,8 @@ const OperadorDashboard = () => {
       </header>
 
       <div className="max-w-6xl mx-auto px-6 py-6 space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {(["pendente", "em_analise", "corrigido", "rejeitado", "aprovado", "faturado"] as StatusDocumento[]).map((st) => {
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {(["recebido", "em_revisao", "aprovado", "cancelado"] as StatusDocumento[]).map((st) => {
             const cfg = statusConfig[st];
             const count = submissions.filter((s) => s.status === st).length;
             const Icon = cfg.icon;
