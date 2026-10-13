@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { excluirEnvio } from "@/lib/pedidos-db";
 import {
   AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Download, ExternalLink, Eye, FileText,
   Image as ImageIcon, Loader2, Mail, MapPin, Phone, Send, ShieldAlert, ShieldCheck, ShieldQuestion,
@@ -296,7 +298,23 @@ const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
     }
   };
 
-  const { canOperate } = useRoles();
+  const { canOperate, isAdmin } = useRoles();
+  const navigate = useNavigate();
+  const [confirmaExclusao, setConfirmaExclusao] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
+  const excluir = async () => {
+    setExcluindo(true);
+    try {
+      await excluirEnvio(submission.id);
+      qc.invalidateQueries();
+      toast({ title: "Envio excluído" });
+      navigate("/app/documentos", { replace: true });
+    } catch (err) {
+      toast({ title: "Não foi possível excluir", description: (err as Error).message, variant: "destructive" });
+      setExcluindo(false);
+      setConfirmaExclusao(false);
+    }
+  };
   const decidido = submission.status === "aprovado" || submission.status === "cancelado";
 
   const achadoVisual = (r: string) =>
@@ -327,8 +345,32 @@ const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">Enviado em {formatDateTime(submission.dataEnvio)}</p>
         </div>
-        <StatusBadge status={submission.status} className="self-start px-2.5 py-1 text-sm sm:self-end" />
+        <div className="flex items-center gap-3 self-start sm:self-end">
+          {isAdmin && (
+            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" onClick={() => setConfirmaExclusao(true)}>
+              Excluir envio
+            </Button>
+          )}
+          <StatusBadge status={submission.status} className="px-2.5 py-1 text-sm" />
+        </div>
       </header>
+
+      <AlertDialog open={confirmaExclusao} onOpenChange={setConfirmaExclusao}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir o envio do PI {submission.numeroPi}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Os arquivos, o histórico e os e-mails deste envio são removidos de vez. A medição do PI continua e volta a aguardar documentos. Não dá para desfazer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={excluindo}>Voltar</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); void excluir(); }} disabled={excluindo}>
+              {excluindo ? "Excluindo" : "Excluir envio"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
         <div className="min-w-0 space-y-6">

@@ -22,7 +22,7 @@ import { useRoles } from "@/hooks/use-roles";
 import { useToast } from "@/hooks/use-toast";
 import { getCampaigns } from "@/lib/campaigns";
 import {
-  excluirPedido, getPedidoEdicao, montarDocumento, mudarStatusPedido, proximoNumeroPi, salvarPedido,
+  excluirPedido, excluirPedidoCompleto, getPedidoEdicao, montarDocumento, mudarStatusPedido, proximoNumeroPi, salvarPedido,
   type PedidoEdicao, type StatusPi,
 } from "@/lib/pedidos-db";
 import {
@@ -53,7 +53,8 @@ const PedidoEditor = () => {
   const qc = useQueryClient();
   const { toast } = useToast();
   const session = useSession();
-  const { canOperate } = useRoles();
+  const { canOperate, isAdmin } = useRoles();
+  const [comEnvios, setComEnvios] = useState(false);
   const { data: clientes = [] } = useClientes();
   const { data: veiculos = [] } = useVeiculos();
   const { data: campanhas = [] } = useQuery({ queryKey: ["campanhas"], queryFn: () => getCampaigns() });
@@ -230,9 +231,10 @@ const PedidoEditor = () => {
     }
     if (acao === "excluir" && pedido.id) {
       try {
-        await excluirPedido(pedido.id);
-        qc.invalidateQueries({ queryKey: ["pedidos"] });
-        toast({ title: "Rascunho excluído" });
+        if (isAdmin) await excluirPedidoCompleto(pedido.id, comEnvios);
+        else await excluirPedido(pedido.id);
+        qc.invalidateQueries();
+        toast({ title: isAdmin ? "PI excluído" : "Rascunho excluído" });
         navigate("/app/pedidos", { replace: true });
       } catch (e) {
         toast({ title: "Não foi possível excluir", description: (e as Error).message, variant: "destructive" });
@@ -578,6 +580,9 @@ const PedidoEditor = () => {
               {!novo && pedido.status === "rascunho" && (
                 <Button variant="ghost" className="w-full text-muted-foreground hover:text-destructive" onClick={() => setConfirmar("excluir")}>Excluir rascunho</Button>
               )}
+              {!novo && pedido.status === "emitido" && isAdmin && (
+                <Button variant="ghost" className="w-full text-muted-foreground hover:text-destructive" onClick={() => { setComEnvios(false); setConfirmar("excluir"); }}>Excluir PI</Button>
+              )}
             </div>
           )}
           {canOperate && pedido.status === "cancelado" && pedido.id && (
@@ -600,6 +605,9 @@ const PedidoEditor = () => {
               >
                 Reativar PI
               </Button>
+              {isAdmin && (
+                <Button variant="ghost" className="w-full text-muted-foreground hover:text-destructive" onClick={() => { setComEnvios(false); setConfirmar("excluir"); }}>Excluir PI</Button>
+              )}
             </div>
           )}
           {!canOperate && <p className="text-xs text-muted-foreground">Só operadores e administradores editam PIs.</p>}
@@ -610,13 +618,19 @@ const PedidoEditor = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirmar === "emitir" ? `Emitir o PI ${pedido.numero}?` : confirmar === "cancelar" ? `Cancelar o PI ${pedido.numero}?` : "Excluir este rascunho?"}
+              {confirmar === "emitir" ? `Emitir o PI ${pedido.numero}?` : confirmar === "cancelar" ? `Cancelar o PI ${pedido.numero}?` : pedido.status === "rascunho" ? "Excluir este rascunho?" : `Excluir o PI ${pedido.numero}?`}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirmar === "emitir" &&
                 `Vai ao veículo ${veiculos.find((v) => v.id === pedido.veiculoId)?.nome ?? ""} com líquido de ${formatBRL(totais.liquido)} e vencimento em ${formatVencimento(pedido.dataEmissao, pedido.prazoDias, pedido.prazoBase)}. Depois de emitido, os documentos enviados com este número são ligados a ele.`}
               {confirmar === "cancelar" && "O PI deixa de contar nos totais. O histórico fica guardado."}
-              {confirmar === "excluir" && "O rascunho é removido de vez."}
+              {confirmar === "excluir" && (pedido.status === "rascunho" ? "O rascunho é removido de vez." : "O PI e a medição dele são removidos de vez. Não dá para desfazer.")}
+              {confirmar === "excluir" && isAdmin && pedido.status !== "rascunho" && (
+                <label className="mt-4 flex cursor-pointer items-start gap-2 text-foreground">
+                  <input type="checkbox" className="mt-1" checked={comEnvios} onChange={(e) => setComEnvios(e.target.checked)} />
+                  <span>Excluir também os envios de documentos recebidos para este PI, com os arquivos.</span>
+                </label>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -188,6 +188,27 @@ export async function excluirPedido(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Remove arquivos do Storage; falha em um arquivo não impede a exclusão do registro. */
+export async function removerArquivos(caminhos: string[] | null): Promise<void> {
+  if (!caminhos || caminhos.length === 0) return;
+  const { error } = await supabase.storage.from("documentos").remove(caminhos);
+  if (error) console.error("Erro ao remover arquivos:", error);
+}
+
+/** Administrador: exclui o PI (qualquer status) com a medição; opcionalmente os envios ligados a ele. */
+export async function excluirPedidoCompleto(id: string, comEnvios: boolean): Promise<void> {
+  const { data, error } = await supabase.rpc("excluir_pedido", { p_id: id, p_com_envios: comEnvios });
+  if (error) throw error;
+  await removerArquivos(data as string[] | null);
+}
+
+/** Administrador: exclui o envio recebido, com arquivos, histórico e e-mails. */
+export async function excluirEnvio(id: string): Promise<void> {
+  const { data, error } = await supabase.rpc("excluir_envio", { p_id: id });
+  if (error) throw error;
+  await removerArquivos(data as string[] | null);
+}
+
 export async function getAgencia(): Promise<Agencia | null> {
   const { data, error } = await supabase.from("agencia").select("*").maybeSingle();
   if (error) throw error;
