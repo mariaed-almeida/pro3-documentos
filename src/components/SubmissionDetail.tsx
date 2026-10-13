@@ -508,7 +508,7 @@ const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
                     <div className="flex items-baseline justify-between gap-3">
                       <span>{e.tipo === "protocolo" ? "Protocolo" : "Devolução"}</span>
                       <span className={cn("text-xs", e.status === "enviado" ? "text-success" : "text-destructive")}>
-                        {e.status === "enviado" ? "enviado" : e.status === "nao_configurado" ? "sem serviço de e-mail" : "falhou"}
+                        {e.status === "enviado" ? (e.erro?.startsWith("Modo de teste") ? "enviado em modo de teste" : "enviado") : e.status === "nao_configurado" ? "sem serviço de e-mail" : "falhou"}
                       </span>
                     </div>
                     <p className="truncate text-xs text-muted-foreground">

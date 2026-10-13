@@ -175,6 +175,9 @@ Deno.serve(async (req) => {
     if (!chave) chave = ((await supabase.rpc("obter_segredo", { p_nome: "resend_api_key" })).data as string | null) ?? undefined;
     if (!remetente) remetente = ((await supabase.rpc("obter_segredo", { p_nome: "email_from" })).data as string | null) ?? undefined;
 
+    // Modo de teste: enquanto o domínio de envio não está verificado, tudo vai para um endereço de teste.
+    const redirecionar = ((await supabase.rpc("obter_segredo", { p_nome: "email_redirecionar" })).data as string | null) ?? undefined;
+
     if (!chave) {
       await registrar("nao_configurado", "Chave do serviço de e-mail não configurada");
       return json({ success: false, code: "email_nao_configurado", error: "O serviço de e-mail ainda não está configurado." }, 503);
@@ -185,9 +188,14 @@ Deno.serve(async (req) => {
       headers: { Authorization: `Bearer ${chave}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         from: remetente ?? "Pró3 Documentos <onboarding@resend.dev>",
-        to: [s.contato_email],
-        subject: assunto,
-        html,
+        to: [redirecionar ?? s.contato_email],
+        subject: redirecionar ? `[TESTE para ${s.contato_email}] ${assunto}` : assunto,
+        html: redirecionar
+          ? html.replace(
+              /(<div style="padding: 28px 30px;">)/,
+              `<div style="padding: 12px 30px; background: #fff7e6; border-bottom: 1px solid #f0d9a8; font-size: 12px; color: #7a5200;">Modo de teste: este e-mail iria para <strong>${esc(s.contato_email)}</strong> e foi desviado para você.</div>$1`,
+            )
+          : html,
         ...(agencia?.email_financeiro ? { reply_to: agencia.email_financeiro } : {}),
       }),
     });
@@ -210,7 +218,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    await registrar("enviado", undefined, dados?.id);
+    await registrar("enviado", redirecionar ? `Modo de teste: entregue a ${redirecionar}` : undefined, dados?.id);
     return json({ success: true, emailId: dados?.id });
   } catch (err) {
     console.error("enviar-email:", err);
