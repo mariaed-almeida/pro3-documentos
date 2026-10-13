@@ -1,2 +1,0 @@
-CREATE POLICY "Authenticated can create submissions" ON public.submissions FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY "Authenticated can create documents" ON public.documents FOR INSERT TO authenticated WITH CHECK (true);

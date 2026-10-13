@@ -1,1 +1,0 @@
-ALTER TABLE public.submissions ADD COLUMN IF NOT EXISTS documentos_completos boolean DEFAULT false;

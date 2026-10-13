@@ -1,1 +1,0 @@
-REVOKE EXECUTE ON FUNCTION public.trigger_analise_ia() FROM PUBLIC, anon, authenticated;

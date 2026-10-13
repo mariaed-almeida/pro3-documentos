@@ -33,7 +33,7 @@ interface DbDocument {
 interface Props {
   submission: Submission;
 
-  onStatusUpdate: (id: string, status: StatusDocumento) => void;
+  onStatusUpdate: (id: string, status: StatusDocumento) => void | Promise<void>;
 }
 
 const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
@@ -183,28 +183,17 @@ const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
     }
     setSendingReject(true);
     try {
-      // Update status
-      onStatusUpdate(submission.id, "em_revisao");
-
-      // Save observation
+      // A observação vai antes do status para entrar no histórico do envio.
       await supabase
         .from("submissions")
         .update({ observacoes: rejectMessage.trim() })
         .eq("id", submission.id);
+      await onStatusUpdate(submission.id, "em_revisao");
 
-      // Send email notification via edge function
-      await supabase.functions.invoke("send-rejection-email", {
-        body: {
-          to: submission.contatoEmail,
-          nomeContato: submission.contatoNome,
-          numeroPi: submission.numeroPi,
-          nomeVeiculo: submission.nomeVeiculo,
-          cliente: submission.cliente,
-          campanha: submission.campanha,
-          motivo: rejectMessage.trim(),
-        },
+      const { error: emailError } = await supabase.functions.invoke("send-rejection-email", {
+        body: { submissionId: submission.id, motivo: rejectMessage.trim() },
       });
-
+      if (emailError) throw emailError;
       toast({ title: "E-mail de correção enviado ao veículo" });
       setShowRejectModal(false);
       setRejectMessage("");

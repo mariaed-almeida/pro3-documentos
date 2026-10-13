@@ -67,7 +67,7 @@ export async function addSubmission(
       contato_email: submission.contatoEmail,
       contato_telefone: submission.contatoTelefone,
       observacoes: submission.observacoes || null,
-      status: "pendente",
+      status: "recebido",
       data_envio: dataEnvio,
       documentos_completos: false,
     });
@@ -91,7 +91,7 @@ export async function addSubmission(
     contato_nome: submission.contatoNome,
     contato_email: submission.contatoEmail,
     contato_telefone: submission.contatoTelefone,
-    status: "pendente",
+    status: "recebido",
     observacoes: submission.observacoes || null,
     data_envio: dataEnvio,
     analise_ia: null,
@@ -172,18 +172,11 @@ export async function addSubmission(
     }
   }
 
-  // Marcamos a submission como "documentos completos" — é essa mudança (UPDATE) que o
-  // Database Webhook escuta para disparar a pré-análise por IA automaticamente.
-  const { error: completeError, data: completeData } = await supabase
-    .from("submissions")
-    .update({ documentos_completos: true })
-    .eq("id", sub.id)
-    .select("id, documentos_completos");
-
+  // Marca o envio como completo pela função do banco. Isso dispara a pré-análise
+  // automática e só vale para envios recém-criados que já têm documentos.
+  const { error: completeError } = await supabase.rpc("concluir_envio", { p_id: sub.id });
   if (completeError) {
-    console.error("ERRO ao marcar documentos_completos:", JSON.stringify(completeError));
-  } else {
-    console.log("documentos_completos atualizado:", JSON.stringify(completeData));
+    console.error("Erro ao concluir envio:", completeError.message);
   }
 
   return mapDbToSubmission(sub, docRecords.map((doc, index) => ({

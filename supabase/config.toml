@@ -1,1 +1,8 @@
-project_id = "fvadyiuendhtqxddsmfw"
+project_id = "bkirbcoixrjuzfsjqlvt"
+
+[functions.analisar-documentacao]
+# Autenticação própria: segredo do webhook (Vault) ou JWT de usuário da equipe.
+verify_jwt = false
+
+[functions.send-rejection-email]
+verify_jwt = true
