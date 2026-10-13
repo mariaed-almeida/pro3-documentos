@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { excluirEnvio } from "@/lib/pedidos-db";
+import CertidoesDoEnvio from "@/components/app/CertidoesDoEnvio";
 import {
   AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Download, ExternalLink, Eye, FileText,
   Image as ImageIcon, Loader2, Mail, MapPin, Phone, Send, ShieldAlert, ShieldCheck, ShieldQuestion,
@@ -81,6 +82,7 @@ const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
         throw new Error(motivo || error?.message || "Falha ao analisar documentação");
       }
       setAnaliseIa(data.analise);
+      qc.invalidateQueries({ queryKey: ["certidoes"] });
       gerada = data.analise;
       toast({ title: "Análise concluída", description: "Revise as sugestões da IA abaixo." });
     } catch (err: any) {
@@ -479,6 +481,8 @@ const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
               </div>
             )}
           </Panel>
+
+          <CertidoesDoEnvio submissionId={submission.id} />
         </div>
 
         <aside className="space-y-6 lg:sticky lg:top-8 lg:self-start">

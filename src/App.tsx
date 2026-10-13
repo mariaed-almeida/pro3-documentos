@@ -12,6 +12,7 @@ import OAuthConsent from "./pages/OAuthConsent.tsx";
 import NotFound from "./pages/NotFound.tsx";
 const Overview = lazy(() => import("./pages/app/Overview.tsx"));
 const Documentos = lazy(() => import("./pages/app/Documentos.tsx"));
+const Certidoes = lazy(() => import("./pages/app/Certidoes.tsx"));
 const DocumentoDetalhe = lazy(() => import("./pages/app/DocumentoDetalhe.tsx"));
 const Aprovacoes = lazy(() => import("./pages/app/Aprovacoes.tsx"));
 const Analises = lazy(() => import("./pages/app/Analises.tsx"));
@@ -46,6 +47,7 @@ const App = () => (
             <Route index element={<Overview />} />
             <Route path="documentos" element={<Documentos />} />
             <Route path="documentos/:id" element={<DocumentoDetalhe />} />
+            <Route path="certidoes" element={<Certidoes />} />
             <Route path="aprovacoes" element={<Aprovacoes />} />
             <Route path="pedidos" element={<Pedidos />} />
             <Route path="pedidos/novo" element={<PedidoEditor />} />

@@ -139,8 +139,19 @@ Use "nao_verificavel" quando o arquivo necessário não foi enviado ou está ile
 
 Depois das checagens, escreva as "pendencias": uma frase curta e objetiva para cada ponto que o veículo precise corrigir ou enviar, dirigida a ele (ex.: "Incluir o número do contrato 031/2023 na descrição da nota fiscal."). Use só os pontos com resultado "atencao" e os arquivos exigidos que faltaram. Não inclua itens "ok" nem "nao_verificavel", não explique o raciocínio da análise e não repita a mesma correção. Se nada precisa ser corrigido, devolva a lista vazia.
 
+Também extraia, em "certidoes", cada certidão que aparecer nos arquivos (um mesmo arquivo pode conter várias). Para cada uma, copie só o que está escrito no documento; se um campo não aparecer, use null:
+- "arquivo": número do arquivo na lista acima (1, 2, ...);
+- "orgao": "federal" (Receita/PGFN), "fgts" (Caixa, CRF), "trabalhista" (CNDT), "estadual", "municipal" ou "outra";
+- "nome": título da certidão como impresso;
+- "cnpj": só os 14 dígitos do CNPJ do certificado;
+- "razao_social": nome do contribuinte;
+- "situacao": "negativa", "positiva_com_efeito_de_negativa", "positiva" ou null;
+- "emitida_em" e "validade": datas no formato AAAA-MM-DD;
+- "codigo": código de controle ou de validação impresso;
+- "url_validacao": endereço de internet impresso para conferir a autenticidade, começando por http ou https.
+
 Responda SOMENTE com JSON, sem texto antes ou depois, neste formato:
-{"achados":[{"checagem":"nome curto","resultado":"atencao"|"ok"|"nao_verificavel","detalhe":"explicação breve em português, em tom de sugestão"}],"pendencias":["frase para o veículo"]}`;
+{"achados":[{"checagem":"nome curto","resultado":"atencao"|"ok"|"nao_verificavel","detalhe":"explicação breve em português, em tom de sugestão"}],"pendencias":["frase para o veículo"],"certidoes":[{"arquivo":1,"orgao":"federal","nome":"...","cnpj":"00000000000000","razao_social":"...","situacao":"negativa","emitida_em":"2026-01-31","validade":"2026-07-30","codigo":"...","url_validacao":"https://..."}]}`;
 
     const conteudo: unknown[] = [];
     for (const a of arquivos) {
@@ -157,6 +168,8 @@ Responda SOMENTE com JSON, sem texto antes ou depois, neste formato:
     // e extrai o objeto JSON mesmo que venha com texto antes ou depois.
     let achados: { achados: unknown[] } | null = null;
     let falhaIa = false;
+    let ultimoTexto = "";
+    let ultimaParada = "";
     for (let tentativa = 1; tentativa <= 2 && !achados; tentativa++) {
       const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -167,7 +180,7 @@ Responda SOMENTE com JSON, sem texto antes ou depois, neste formato:
         },
         body: JSON.stringify({
           model: MODELO,
-          max_tokens: 4000,
+          max_tokens: 8000,
           messages: [{ role: "user", content: conteudo }],
         }),
       });
@@ -183,6 +196,8 @@ Responda SOMENTE com JSON, sem texto antes ou depois, neste formato:
       const aiData = await aiResponse.json();
       const texto: string = aiData.content?.find((b: any) => b.type === "text")?.text ?? "";
       const bruto = texto.replace(/```json\s*|```\s*/g, "");
+      ultimoTexto = texto;
+      ultimaParada = aiData.stop_reason;
       const trecho = bruto.slice(bruto.indexOf("{"), bruto.lastIndexOf("}") + 1);
       try {
         const lido = JSON.parse(trecho);
@@ -195,7 +210,7 @@ Responda SOMENTE com JSON, sem texto antes ou depois, neste formato:
 
     if (!achados) {
       return json(
-        { error: falhaIa ? "Falha ao chamar a IA" : "A IA retornou um formato inesperado. Tente novamente." },
+        { error: falhaIa ? "Falha ao chamar a IA" : "A IA retornou um formato inesperado. Tente novamente.", debug: ultimoTexto.slice(-500), parada: ultimaParada },
         502,
       );
     }
@@ -205,6 +220,53 @@ Responda SOMENTE com JSON, sem texto antes ou depois, neste formato:
       .map((t: string) => t.trim());
     const analise = { geradoEm: new Date().toISOString(), achados: achados.achados, pendencias };
     await supabase.from("submissions").update({ analise_ia: analise }).eq("id", submissionId);
+
+    // Certidões lidas: substitui as do envio e liga ao veículo (pelo PI ou pelo CNPJ).
+    try {
+      const soDigitos = (v: unknown) => (typeof v === "string" ? v.replace(/\D/g, "") : "");
+      const texto = (v: unknown, max = 200) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
+      const data = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(Date.parse(v)) ? v : null);
+      const ORGAOS = ["federal", "fgts", "trabalhista", "estadual", "municipal", "outra"];
+      const SITUACOES = ["negativa", "positiva_com_efeito_de_negativa", "positiva"];
+
+      let esperado = "";
+      let veiculoDoPi: string | null = null;
+      if (submission.pedido_id) {
+        const { data: pi } = await supabase.from("pedidos_insercao").select("veiculo_id").eq("id", submission.pedido_id).maybeSingle();
+        if (pi?.veiculo_id) {
+          const { data: v } = await supabase.from("veiculos").select("id, cnpj").eq("id", pi.veiculo_id).maybeSingle();
+          veiculoDoPi = v?.id ?? null;
+          esperado = soDigitos(v?.cnpj);
+        }
+      }
+      const { data: veiculos } = await supabase.from("veiculos").select("id, cnpj");
+      const porCnpj = new Map((veiculos ?? []).map((v: any) => [soDigitos(v.cnpj), v.id as string]));
+
+      const lidas = (Array.isArray((achados as any).certidoes) ? (achados as any).certidoes : []).slice(0, 20);
+      const linhas = lidas.map((c: any) => {
+        const cnpj = soDigitos(c.cnpj);
+        const url = typeof c.url_validacao === "string" && /^https?:\/\/\S+$/i.test(c.url_validacao.trim()) ? c.url_validacao.trim().slice(0, 300) : null;
+        return {
+          submission_id: submissionId,
+          veiculo_id: veiculoDoPi ?? (cnpj.length === 14 ? (porCnpj.get(cnpj) ?? null) : null),
+          orgao: ORGAOS.includes(c.orgao) ? c.orgao : "outra",
+          nome: texto(c.nome),
+          cnpj: cnpj.length === 14 ? cnpj : null,
+          razao_social: texto(c.razao_social),
+          situacao: SITUACOES.includes(c.situacao) ? c.situacao : null,
+          emitida_em: data(c.emitida_em),
+          validade: data(c.validade),
+          codigo: texto(c.codigo, 120),
+          url_validacao: url,
+          cnpj_confere: esperado && cnpj.length === 14 ? cnpj === esperado : null,
+          arquivo: arquivos[Number(c.arquivo) - 1]?.label ?? null,
+        };
+      });
+      await supabase.from("certidoes").delete().eq("submission_id", submissionId);
+      if (linhas.length > 0) await supabase.from("certidoes").insert(linhas);
+    } catch (e) {
+      console.error("Erro ao gravar certidões:", e);
+    }
 
     return json({ success: true, analise });
   } catch (err) {

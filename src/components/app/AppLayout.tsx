@@ -2,7 +2,7 @@ import { Suspense, useEffect, useState } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   BarChart3, Building2, ClipboardCheck, ExternalLink, FileStack, LayoutDashboard, Landmark, Receipt, UserCog, FilePlus2, Briefcase,
-  Loader2, LogOut, Megaphone, Menu, Radio,
+  Loader2, LogOut, Megaphone, Menu, Radio, ShieldCheck,
 } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,6 +35,7 @@ const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => {
     { to: "/app", label: "Visão geral", icon: LayoutDashboard, end: true },
     { to: "/app/pedidos", label: "Pedidos de inserção", icon: FilePlus2 },
     { to: "/app/documentos", label: "Documentos", icon: FileStack },
+    { to: "/app/certidoes", label: "Certidões", icon: ShieldCheck },
     { to: "/app/aprovacoes", label: "Aprovações", icon: ClipboardCheck, badge: pendentes },
     { to: "/app/faturamento", label: "Faturamento", icon: Receipt, badge: faturamentoPendente },
     { to: "/app/gerencial", label: "Visão gerencial", icon: Landmark },

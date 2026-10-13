@@ -333,6 +333,28 @@ export type Database = {
         };
         Relationships: [Rel<{ referencedRelation: "pedidos_insercao" }>];
       };
+      certidoes: {
+        Row: {
+          id: string;
+          submission_id: string;
+          veiculo_id: string | null;
+          orgao: string;
+          nome: string | null;
+          cnpj: string | null;
+          razao_social: string | null;
+          situacao: string | null;
+          emitida_em: string | null;
+          validade: string | null;
+          codigo: string | null;
+          url_validacao: string | null;
+          cnpj_confere: boolean | null;
+          arquivo: string | null;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [Rel<{ referencedRelation: "submissions" }>, Rel<{ referencedRelation: "veiculos" }>];
+      };
       emails_enviados: {
         Row: {
           assunto: string;
