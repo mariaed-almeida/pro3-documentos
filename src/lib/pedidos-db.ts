@@ -21,6 +21,8 @@ export interface PedidoResumo {
   valorLiquido: number;
   clienteNome: string;
   veiculoNome: string;
+  prazoDias: number;
+  prazoBase: BasePrazo;
 }
 
 export interface PedidoEdicao {
@@ -47,7 +49,7 @@ export interface PedidoEdicao {
 export async function listPedidos(): Promise<PedidoResumo[]> {
   const { data, error } = await supabase
     .from("pedidos_insercao")
-    .select("id, numero, status, cliente_id, veiculo_id, campanha, mes, ano, data_emissao, valor_bruto, comissao, valor_liquido, clientes(nome), veiculos(nome)")
+    .select("id, numero, status, cliente_id, veiculo_id, campanha, mes, ano, data_emissao, prazo_dias, prazo_base, valor_bruto, comissao, valor_liquido, clientes(nome), veiculos(nome)")
     .order("numero", { ascending: false });
   if (error) throw error;
   return (data ?? []).map((p: any) => ({
@@ -65,6 +67,8 @@ export async function listPedidos(): Promise<PedidoResumo[]> {
     valorLiquido: Number(p.valor_liquido),
     clienteNome: p.clientes?.nome ?? "",
     veiculoNome: p.veiculos?.nome ?? "",
+    prazoDias: p.prazo_dias,
+    prazoBase: p.prazo_base as BasePrazo,
   }));
 }
 

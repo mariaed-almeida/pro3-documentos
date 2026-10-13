@@ -18,6 +18,8 @@ export interface AchadoAnaliseIa {
 export interface AnaliseIa {
   geradoEm: string;
   achados: AchadoAnaliseIa[];
+  /** Correções redigidas para o veículo, prontas para a devolução. */
+  pendencias?: string[];
 }
 
 export interface Submission {

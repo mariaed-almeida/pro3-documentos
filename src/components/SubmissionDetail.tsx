@@ -56,6 +56,7 @@ const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
   const [erroAnaliseIa, setErroAnaliseIa] = useState<string | null>(null);
 
   const handleAnalisarComIa = async () => {
+    let gerada: typeof submission.analiseIa | null = null;
     setAnalisandoIa(true);
     setErroAnaliseIa(null);
     try {
@@ -77,6 +78,7 @@ const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
         throw new Error(motivo || error?.message || "Falha ao analisar documentação");
       }
       setAnaliseIa(data.analise);
+      gerada = data.analise;
       toast({ title: "Análise concluída", description: "Revise as sugestões da IA abaixo." });
     } catch (err: any) {
       console.error("Erro na análise de IA:", err);
@@ -84,6 +86,36 @@ const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
       toast({ title: "Erro na análise", description: err.message, variant: "destructive" });
     } finally {
       setAnalisandoIa(false);
+    }
+    return gerada;
+  };
+
+  // Pontos a corrigir apontados pela pré-análise, já redigidos para o veículo.
+  const pendenciasDe = (a: typeof submission.analiseIa | null | undefined): string[] => {
+    if (!a) return [];
+    if (a.pendencias?.length) return a.pendencias;
+    return a.achados.filter((x) => x.resultado === "atencao").map((x) => x.detalhe);
+  };
+  const textoDasPendencias = (itens: string[]) => itens.map((t) => "• " + t).join("\n");
+  const [preenchidoPelaIa, setPreenchidoPelaIa] = useState(false);
+
+  const abrirDevolucao = () => {
+    const itens = pendenciasDe(analiseIa);
+    if (itens.length && !rejectMessage.trim()) {
+      setRejectMessage(textoDasPendencias(itens));
+      setPreenchidoPelaIa(true);
+    }
+    setShowRejectModal(true);
+  };
+
+  const gerarPendenciasComIa = async () => {
+    const a = await handleAnalisarComIa();
+    const itens = pendenciasDe(a);
+    if (itens.length) {
+      setRejectMessage(textoDasPendencias(itens));
+      setPreenchidoPelaIa(true);
+    } else if (a) {
+      toast({ title: "A pré-análise não apontou pendências", description: "Descreva o que precisa ser corrigido." });
     }
   };
 
@@ -182,7 +214,7 @@ const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
 
   const handleStatusClick = (st: StatusDocumento) => {
     if (st === "em_revisao") {
-      setShowRejectModal(true);
+      abrirDevolucao();
     } else {
       onStatusUpdate(submission.id, st);
     }
@@ -209,6 +241,7 @@ const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
       toast({ title: "E-mail de correção enviado ao veículo" });
       setShowRejectModal(false);
       setRejectMessage("");
+      setPreenchidoPelaIa(false);
     } catch (err) {
       console.error("Error sending rejection:", err);
       toast({ title: "Status atualizado, mas houve erro ao enviar e-mail", variant: "destructive" });
@@ -335,6 +368,15 @@ const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
             {analiseIa && (
               <div className="space-y-2">
                 <p className="mb-3 text-xs text-muted-foreground">Gerada em {formatDateTime(analiseIa.geradoEm)}</p>
+                {canOperate && submission.status !== "em_revisao" && pendenciasDe(analiseIa).length > 0 && (
+                  <div className="mb-3 flex items-center justify-between gap-3 rounded-md border border-warning/30 bg-warning/[0.07] px-3 py-2.5">
+                    <p className="text-sm">
+                      <span className="num font-medium">{pendenciasDe(analiseIa).length}</span>{" "}
+                      {pendenciasDe(analiseIa).length === 1 ? "pendência pronta" : "pendências prontas"} para devolver ao veículo.
+                    </p>
+                    <Button size="sm" variant="outline" onClick={abrirDevolucao}>Devolver com estes pontos</Button>
+                  </div>
+                )}
                 {analiseIa.achados.map((achado, i) => {
                   const v = achadoVisual(achado.resultado);
                   return (
@@ -499,14 +541,42 @@ const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5 py-2">
-            <Label htmlFor="motivo">O que precisa ser corrigido</Label>
+            <div className="flex items-end justify-between gap-3">
+              <Label htmlFor="motivo">O que precisa ser corrigido</Label>
+              {analiseIa ? (
+                pendenciasDe(analiseIa).length > 0 && (
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-primary hover:underline"
+                    onClick={() => { setRejectMessage(textoDasPendencias(pendenciasDe(analiseIa))); setPreenchidoPelaIa(true); }}
+                  >
+                    Refazer a partir da pré-análise
+                  </button>
+                )
+              ) : (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline disabled:opacity-50"
+                  onClick={gerarPendenciasComIa}
+                  disabled={analisandoIa}
+                >
+                  {analisandoIa ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                  {analisandoIa ? "Analisando…" : "Gerar pendências com IA"}
+                </button>
+              )}
+            </div>
             <Textarea
               id="motivo"
               placeholder="Ex.: a nota fiscal está sem o número do contrato; anexar CND federal vigente."
               value={rejectMessage}
               onChange={(e) => setRejectMessage(e.target.value)}
-              rows={5}
+              rows={7}
             />
+            <p className="text-xs text-muted-foreground">
+              {preenchidoPelaIa
+                ? "Preenchido pela pré-análise. Revise, apague o que não procede e acrescente o que faltar antes de enviar."
+                : "Uma pendência por linha, em frases que o veículo consiga cumprir."}
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowRejectModal(false)}>Voltar</Button>

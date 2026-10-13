@@ -4,6 +4,7 @@ import { Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Submission } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import {
   baixarProtocoloPdf,
   dadosDoComprovante,
@@ -27,8 +28,22 @@ const SubmissionReceipt = ({ submission }: Props) => {
     setGerando(true);
     try {
       await baixarProtocoloPdf(submission);
-    } catch {
-      toast({ title: "Não foi possível gerar o PDF", description: "Tente novamente em instantes.", variant: "destructive" });
+    } catch (erro) {
+      console.error("Falha ao gerar o PDF do comprovante:", erro);
+      const msg = String((erro as Error)?.message ?? erro);
+      const paginaVelha = /dynamically imported module|importing a module script|failed to fetch|load failed|chunk/i.test(msg);
+      toast({
+        title: "Não foi possível gerar o PDF",
+        description: paginaVelha
+          ? `O sistema foi atualizado com esta página aberta. Seu envio foi recebido (protocolo ${protocolo}). Recarregue para baixar o PDF.`
+          : "Tente novamente em instantes. Se persistir, anote o protocolo acima.",
+        variant: "destructive",
+        action: paginaVelha ? (
+          <ToastAction altText="Recarregar a página" onClick={() => window.location.assign("/veiculo?comprovante=1")}>
+            Recarregar
+          </ToastAction>
+        ) : undefined,
+      });
     } finally {
       setGerando(false);
     }

@@ -50,7 +50,24 @@ const VeiculoForm = () => {
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [maxStep, setMaxStep] = useState(1);
-  const [submittedData, setSubmittedData] = useState<Submission | null>(null);
+  const [submittedData, setSubmittedData] = useState<Submission | null>(() => {
+    // Depois de um recarregamento forçado (ex.: sistema atualizado), recupera o comprovante recém-gerado.
+    try {
+      if (new URLSearchParams(window.location.search).get("comprovante")) {
+        const salvo = sessionStorage.getItem("pro3:ultimo-comprovante");
+        return salvo ? (JSON.parse(salvo) as Submission) : null;
+      }
+    } catch {
+      /* sem armazenamento disponível */
+    }
+    return null;
+  });
+
+  // Carrega o gerador de PDF já no início: se o sistema for atualizado com a página aberta,
+  // o arquivo antigo deixa de existir no servidor e o carregamento tardio falharia.
+  useEffect(() => {
+    void import("jspdf").catch(() => undefined);
+  }, []);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [erro, setErro] = useState<string[]>([]);
 
@@ -234,7 +251,14 @@ const VeiculoForm = () => {
           contatoNome, contatoEmail, contatoTelefone, observacoes: observacoes || undefined },
         files
       );
-      if (result) setSubmittedData(result);
+      if (result) {
+        setSubmittedData(result);
+        try {
+          sessionStorage.setItem("pro3:ultimo-comprovante", JSON.stringify(result));
+        } catch {
+          /* sem armazenamento disponível */
+        }
+      }
       else toast({ title: "Erro", description: "Falha ao enviar documentação. Tente novamente.", variant: "destructive" });
     } catch (err: any) {
       toast({ title: "Erro ao enviar documentação", description: err?.message || "Tente novamente.", variant: "destructive" });

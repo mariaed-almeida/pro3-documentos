@@ -137,8 +137,10 @@ ${textoObrigatorio ? "5. O texto obrigatório aparece literalmente na Nota Fisca
 
 Use "nao_verificavel" quando o arquivo necessário não foi enviado ou está ilegível.
 
+Depois das checagens, escreva as "pendencias": uma frase curta e objetiva para cada ponto que o veículo precise corrigir ou enviar, dirigida a ele (ex.: "Incluir o número do contrato 031/2023 na descrição da nota fiscal."). Use só os pontos com resultado "atencao" e os arquivos exigidos que faltaram. Não inclua itens "ok" nem "nao_verificavel", não explique o raciocínio da análise e não repita a mesma correção. Se nada precisa ser corrigido, devolva a lista vazia.
+
 Responda SOMENTE com JSON, sem texto antes ou depois, neste formato:
-{"achados":[{"checagem":"nome curto","resultado":"atencao"|"ok"|"nao_verificavel","detalhe":"explicação breve em português, em tom de sugestão"}]}`;
+{"achados":[{"checagem":"nome curto","resultado":"atencao"|"ok"|"nao_verificavel","detalhe":"explicação breve em português, em tom de sugestão"}],"pendencias":["frase para o veículo"]}`;
 
     const conteudo: unknown[] = [];
     for (const a of arquivos) {
@@ -198,7 +200,10 @@ Responda SOMENTE com JSON, sem texto antes ou depois, neste formato:
       );
     }
 
-    const analise = { geradoEm: new Date().toISOString(), achados: achados.achados };
+    const pendencias = (Array.isArray((achados as any).pendencias) ? (achados as any).pendencias : [])
+      .filter((t: unknown) => typeof t === "string" && t.trim())
+      .map((t: string) => t.trim());
+    const analise = { geradoEm: new Date().toISOString(), achados: achados.achados, pendencias };
     await supabase.from("submissions").update({ analise_ia: analise }).eq("id", submissionId);
 
     return json({ success: true, analise });
