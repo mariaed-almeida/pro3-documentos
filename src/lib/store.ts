@@ -244,7 +244,7 @@ function mapDbToSubmission(sub: DbSubmission, docs: DbDocument[] = []): Submissi
   const certidoes: string[] = [];
 
   for (const doc of docs) {
-    if (doc.doc_type.startsWith("certidao")) {
+    if (/^certid/.test(doc.doc_type)) {
       certidoes.push(doc.file_name);
     } else if (doc.doc_type === "piAssinado") {
       documentos.piAssinado = doc.file_name;

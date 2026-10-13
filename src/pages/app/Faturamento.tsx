@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Receipt } from "lucide-react";
 import PageHeader from "@/components/app/PageHeader";
 import EmptyState from "@/components/app/EmptyState";
@@ -10,9 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useMedicoes, MEDICOES_KEY } from "@/hooks/use-medicoes";
 import { useSubmissions } from "@/hooks/use-submissions";
 import { useRoles } from "@/hooks/use-roles";
-import { useToast } from "@/hooks/use-toast";
-import { listPedidos } from "@/lib/pedidos-db";
-import { criarMedicao, STATUS_MEDICAO, type Medicao, type StatusMedicao } from "@/lib/medicoes";
+import { STATUS_MEDICAO, type Medicao, type StatusMedicao } from "@/lib/medicoes";
 import { formatBRL } from "@/lib/money";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -21,12 +19,13 @@ import type { Submission } from "@/lib/types";
 type Aba = "a_medir" | StatusMedicao;
 
 const ABAS: { id: Aba; label: string }[] = [
-  { id: "a_medir", label: "A medir" },
+  { id: "aguardando_documentos", label: "Aguardando documentos" },
   { id: "em_medicao", label: "Em medição" },
   { id: "aguardando_liberacao", label: "Aguardando liberação" },
   { id: "liberado", label: "Liberados" },
   { id: "pago", label: "Pagos" },
   { id: "cancelado", label: "Cancelados" },
+  { id: "a_medir", label: "Sem PI" },
 ];
 
 const soma = (lista: Medicao[], campo: "valorBruto" | "comissao" | "valorLiquido") =>
@@ -37,12 +36,8 @@ const Faturamento = () => {
   const { data: medicoes = [], isLoading } = useMedicoes();
   const { data: submissions = [] } = useSubmissions();
   const { canOperate } = useRoles();
-  const { toast } = useToast();
-  const { data: pedidos = [] } = useQuery({ queryKey: ["pedidos"], queryFn: listPedidos });
-  const pedidoPorId = useMemo(() => new Map(pedidos.map((p) => [p.id, p])), [pedidos]);
-  const [gerando, setGerando] = useState<string | null>(null);
 
-  const [aba, setAba] = useState<Aba>("a_medir");
+  const [aba, setAba] = useState<Aba>("em_medicao");
   const [medindo, setMedindo] = useState<Submission | null>(null);
   const [aberta, setAberta] = useState<Medicao | null>(null);
 
@@ -59,36 +54,13 @@ const Faturamento = () => {
   const lista = aba === "a_medir" ? [] : por(aba);
   const refresh = () => qc.invalidateQueries({ queryKey: MEDICOES_KEY });
 
-  const gerarDoPi = async (s: Submission) => {
-    const pi = s.pedidoId ? pedidoPorId.get(s.pedidoId) : undefined;
-    if (!pi) return;
-    setGerando(s.id);
-    try {
-      const mm = String(pi.mes).padStart(2, "0");
-      const ultimo = new Date(pi.ano, pi.mes, 0).getDate();
-      await criarMedicao(s.id, {
-        valorBruto: pi.valorBruto,
-        comissao: pi.comissao,
-        periodoInicio: `${pi.ano}-${mm}-01`,
-        periodoFim: `${pi.ano}-${mm}-${String(ultimo).padStart(2, "0")}`,
-      });
-      toast({ title: "Medição criada a partir do PI " + pi.numero });
-      refresh();
-      setAba("em_medicao");
-    } catch (e) {
-      toast({ title: "Não foi possível gerar a medição", description: (e as Error).message, variant: "destructive" });
-    } finally {
-      setGerando(null);
-    }
-  };
-
   const resumo = [
-    { label: "A medir", valor: `${aMedir.length} ${aMedir.length === 1 ? "PI" : "PIs"}`, nota: "Aprovados sem valor" },
+    { label: "Aguardando documentos", valor: formatBRL(soma(por("aguardando_documentos"), "valorLiquido")), nota: `${por("aguardando_documentos").length} PIs` },
     { label: "Em medição", valor: formatBRL(soma(por("em_medicao"), "valorLiquido")), nota: `${por("em_medicao").length} medições` },
     {
-      label: "Aguardando liberação",
+      label: "No financeiro",
       valor: formatBRL(soma(por("aguardando_liberacao"), "valorLiquido")),
-      nota: `${por("aguardando_liberacao").length} medições`,
+      nota: `${por("aguardando_liberacao").length} aguardando liberação`,
     },
     { label: "Liberado a pagar", valor: formatBRL(soma(por("liberado"), "valorLiquido")), nota: `${por("liberado").length} medições` },
     { label: "Pago", valor: formatBRL(soma(por("pago"), "valorLiquido")), nota: `${por("pago").length} medições` },
@@ -107,7 +79,7 @@ const Faturamento = () => {
       <PageHeader
         eyebrow="Financeiro"
         title="Faturamento"
-        description="A medição nasce do PI emitido quando os documentos são aprovados, com os mesmos valores e o mesmo vencimento. O financeiro libera e registra o pagamento ao veículo."
+        description="Cada PI emitido abre a sua medição, com os mesmos valores e o mesmo vencimento. Os documentos aprovados a movem adiante, o financeiro libera e registra o pagamento, e qualquer etapa pode voltar com o motivo."
         actions={
           <Button asChild variant="outline">
             <Link to="/app/gerencial">Ver visão gerencial</Link>
@@ -126,7 +98,7 @@ const Faturamento = () => {
       </dl>
 
       <div className="flex gap-6 overflow-x-auto border-b" role="tablist">
-        {ABAS.map((a) => {
+        {ABAS.filter((a) => a.id !== "a_medir" || aMedir.length > 0 || aba === "a_medir").map((a) => {
           const n = a.id === "a_medir" ? aMedir.length : por(a.id).length;
           return (
             <button
@@ -169,24 +141,12 @@ const Faturamento = () => {
                     {s.cliente} · {s.campanha}
                   </p>
                 </div>
-                {s.pedidoId && pedidoPorId.get(s.pedidoId) ? (
-                  <span className="num hidden text-right text-xs sm:block">
-                    <span className="block font-medium">{formatBRL(pedidoPorId.get(s.pedidoId)!.valorLiquido)}</span>
-                    <span className="text-muted-foreground">líquido do PI {pedidoPorId.get(s.pedidoId)!.numero}</span>
-                  </span>
-                ) : (
-                  <span className="num hidden text-xs text-muted-foreground sm:block">Sem PI no sistema · enviado {formatDate(s.dataEnvio)}</span>
+                <span className="num hidden text-xs text-muted-foreground sm:block">Sem PI no sistema · enviado {formatDate(s.dataEnvio)}</span>
+                {canOperate && (
+                  <Button size="sm" variant="outline" onClick={() => setMedindo(s)}>
+                    Medir
+                  </Button>
                 )}
-                {canOperate &&
-                  (s.pedidoId && pedidoPorId.get(s.pedidoId) ? (
-                    <Button size="sm" onClick={() => gerarDoPi(s)} disabled={gerando === s.id}>
-                      {gerando === s.id && <Loader2 className="animate-spin" />} Gerar medição
-                    </Button>
-                  ) : (
-                    <Button size="sm" variant="outline" onClick={() => setMedindo(s)}>
-                      Medir
-                    </Button>
-                  ))}
               </li>
             ))}
           </ul>

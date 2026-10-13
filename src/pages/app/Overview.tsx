@@ -10,7 +10,7 @@ import { useSubmissions } from "@/hooks/use-submissions";
 import { useSession } from "@/hooks/use-session";
 import { listPedidos, type PedidoResumo } from "@/lib/pedidos-db";
 import { formatVencimento } from "@/lib/pedidos";
-import type { Medicao } from "@/lib/medicoes";
+import { STATUS_MEDICAO, type Medicao } from "@/lib/medicoes";
 import { formatBRL, formatBRLCompact } from "@/lib/money";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -101,18 +101,26 @@ const Overview = () => {
     const pedYm = (p: PedidoResumo) => `${p.ano}-${String(p.mes).padStart(2, "0")}`;
 
     const estagioDe = (st: Medicao["status"]): Estagio =>
-      st === "pago" ? "pago" : st === "liberado" ? "liberado" : st === "aguardando_liberacao" ? "aguardando" : "medicao";
+      st === "pago" ? "pago" : st === "liberado" ? "liberado" : st === "aguardando_liberacao" ? "aguardando" : st === "aguardando_documentos" ? "travado" : "medicao";
 
     /** Carteira de um mês de veiculação, por estágio (valor bruto). */
     const carteira = (chave: string) => {
       const por: Record<Estagio, number> = { pago: 0, liberado: 0, aguardando: 0, medicao: 0, travado: 0 };
+      let comissao = 0;
+      let liquido = 0;
       for (const p of emitidos.filter((x) => pedYm(x) === chave)) {
         const m = medPorPedido.get(p.id);
         por[m ? estagioDe(m.status) : "travado"] += p.valorBruto;
+        comissao += p.comissao;
+        liquido += p.valorLiquido;
       }
-      for (const m of ativas.filter((x) => !x.pedidoId && periodoMed(x) === chave)) por[estagioDe(m.status)] += m.valorBruto;
+      for (const m of ativas.filter((x) => !x.pedidoId && periodoMed(x) === chave)) {
+        por[estagioDe(m.status)] += m.valorBruto;
+        comissao += m.comissao;
+        liquido += m.valorLiquido;
+      }
       const previsto = soma(rascunhos.filter((x) => pedYm(x) === chave).map((x) => x.valorBruto));
-      return { por, previsto, total: soma(Object.values(por)) };
+      return { por, previsto, total: soma(Object.values(por)), comissao, liquido };
     };
 
     const mes = (chave: string) => {
@@ -135,9 +143,9 @@ const Overview = () => {
           .map((m) => m.valorLiquido),
       );
       const aVir = soma(
-        emitidos
-          .filter((p) => !medPorPedido.has(p.id) && ym(new Date(formatVencIso(p))) === chave)
-          .map((p) => p.valorLiquido),
+        ativas
+          .filter((m) => m.status === "aguardando_documentos" && (ymDeStr(m.vencimento) ?? ym(new Date(m.createdAt))) === chave)
+          .map((m) => m.valorLiquido),
       );
       return { pago, agendado, aVir };
     };
@@ -167,14 +175,16 @@ const Overview = () => {
   const fluxoTemDados = dadosFluxo.some((d) => d.pago + d.agendado + d.aVir > 0);
 
   const hoje = new Date().toISOString().slice(0, 10);
-  const vencimentos = [
-    ...dados.ativas
-      .filter((m) => m.status === "liberado" || m.status === "aguardando_liberacao")
-      .map((m) => ({ id: m.id, titulo: m.nomeVeiculo, sub: `PI ${m.numeroPi} · ${m.status === "liberado" ? "liberado" : "no financeiro"}`, data: m.previsaoPagamento ?? m.vencimento ?? m.createdAt.slice(0, 10), valor: m.valorLiquido, to: "/app/faturamento" })),
-    ...dados.emitidos
-      .filter((p) => !dados.medPorPedido.has(p.id))
-      .map((p) => ({ id: p.id, titulo: p.veiculoNome, sub: `PI ${p.numero} · aguardando documentos`, data: formatVencIso(p), valor: p.valorLiquido, to: `/app/pedidos/${p.id}` })),
-  ]
+  const vencimentos = dados.ativas
+    .filter((m) => m.status === "liberado" || m.status === "aguardando_liberacao" || m.status === "aguardando_documentos" || m.status === "em_medicao")
+    .map((m) => ({
+      id: m.id,
+      titulo: m.nomeVeiculo,
+      sub: `PI ${m.numeroPi} · ${STATUS_MEDICAO[m.status].label.toLowerCase()}`,
+      data: m.previsaoPagamento ?? m.vencimento ?? m.createdAt.slice(0, 10),
+      valor: m.valorLiquido,
+      to: "/app/faturamento",
+    }))
     .sort((a, b) => (a.data < b.data ? -1 : 1))
     .slice(0, 6);
 
@@ -223,19 +233,18 @@ const Overview = () => {
 
       <div className="grid gap-4 lg:grid-cols-12">
         {/* Carteira do mês */}
-        <section className="relative overflow-hidden rounded-[20px] bg-[hsl(222_26%_8%)] p-6 text-white shadow-[0_24px_48px_-24px_rgba(8,12,30,0.6)] sm:p-8 lg:col-span-8" aria-labelledby="carteira-titulo">
-          <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[hsl(216_100%_45%)] opacity-[0.16] blur-3xl" aria-hidden />
-          <p id="carteira-titulo" className="relative text-sm text-white/60">
+        <section className={cn(card, "relative p-6 sm:p-8 lg:col-span-8")} aria-labelledby="carteira-titulo">
+          <p id="carteira-titulo" className="relative text-sm text-muted-foreground">
             Carteira de {format(ref, "MMMM", { locale: ptBR })} · faturamento travado em PIs emitidos
           </p>
           <div className="relative mt-3 flex flex-wrap items-end gap-x-4 gap-y-2">
             <Dinheiro valor={cart.total} className="text-5xl font-semibold leading-none tracking-tight sm:text-6xl" />
-            {ant.bruto > 0 && <Delta atual={atual.bruto} anterior={ant.bruto} escuro />}
+            {ant.bruto > 0 && <Delta atual={atual.bruto} anterior={ant.bruto} />}
           </div>
-          <p className="relative mt-3 text-sm text-white/60">
+          <p className="relative mt-3 text-sm text-muted-foreground">
             {cart.previsto > 0 ? (
               <>
-                Mais <span className="num text-white/90">{formatBRL(cart.previsto)}</span> em rascunhos de PI que ainda podem entrar.
+                Mais <span className="num text-foreground">{formatBRL(cart.previsto)}</span> em rascunhos de PI que ainda podem entrar.
               </>
             ) : (
               "Nenhum rascunho de PI previsto para o mês."
@@ -244,7 +253,7 @@ const Overview = () => {
 
           {/* Barra de estágios */}
           <div className="relative mt-8" role="img" aria-label={`Carteira por estágio: ${ESTAGIOS.map((e) => `${e.rotulo} ${formatBRL(cart.por[e.id])}`).join(", ")}`}>
-            <div className="flex h-3 gap-[3px] overflow-hidden rounded-full bg-white/10">
+            <div className="flex h-3 gap-[3px] overflow-hidden rounded-full bg-muted">
               {cart.total > 0 ? (
                 ESTAGIOS.filter((e) => cart.por[e.id] > 0).map((e) => (
                   <div key={e.id} style={{ width: `${(cart.por[e.id] / cart.total) * 100}%`, background: e.cor }} className="h-full first:rounded-l-full last:rounded-r-full" title={`${e.rotulo}: ${formatBRL(cart.por[e.id])}`} />
@@ -256,7 +265,7 @@ const Overview = () => {
             <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-5">
               {ESTAGIOS.map((e) => (
                 <div key={e.id}>
-                  <dt className="flex items-center gap-1.5 text-xs text-white/55">
+                  <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <span className="h-2 w-2 rounded-full" style={{ background: e.cor }} aria-hidden />
                     {e.rotulo}
                   </dt>
@@ -266,23 +275,23 @@ const Overview = () => {
             </dl>
           </div>
 
-          <div className="relative mt-8 grid gap-x-4 gap-y-5 border-t border-white/10 pt-6 sm:grid-cols-3">
+          <div className="relative mt-8 grid gap-x-4 gap-y-5 border-t border-border pt-6 sm:grid-cols-3">
             <div>
-              <p className="text-xs text-white/55">Comissão da agência</p>
-              <p className="num mt-1 text-xl font-semibold tracking-tight">{formatBRL(atual.comissao)}</p>
+              <p className="text-xs text-muted-foreground">Comissão da agência</p>
+              <p className="num mt-1 text-xl font-semibold tracking-tight">{formatBRL(cart.comissao)}</p>
             </div>
             <div>
-              <p className="text-xs text-white/55">Líquido aos veículos</p>
-              <p className="num mt-1 text-xl font-semibold tracking-tight">{formatBRL(atual.liquido)}</p>
+              <p className="text-xs text-muted-foreground">Líquido aos veículos</p>
+              <p className="num mt-1 text-xl font-semibold tracking-tight">{formatBRL(cart.liquido)}</p>
             </div>
             <div>
-              <p className="text-xs text-white/55">Já pago da carteira</p>
+              <p className="text-xs text-muted-foreground">Já pago da carteira</p>
               <p className="num mt-1 text-xl font-semibold tracking-tight">{pagoPct}%</p>
             </div>
           </div>
 
           {semNada && (
-            <Link to="/app/pedidos/novo" className="relative mt-6 inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-sm font-medium text-[hsl(222_26%_8%)]">
+            <Link to="/app/pedidos/novo" className="relative mt-6 inline-flex items-center gap-1.5 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background">
               Emitir o primeiro PI <ArrowRight className="h-4 w-4" />
             </Link>
           )}

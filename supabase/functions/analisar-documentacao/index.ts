@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
     const relevantes = documents.filter(
       (d: any) =>
         ["notaFiscal", "notaFiscalGrafica", "declaracaoArtigo299", "declaracaoSimplesNacional"].includes(d.doc_type) ||
-        d.doc_type.startsWith("certidao"),
+        /^certid/.test(d.doc_type),
     );
     const legiveis = relevantes.filter((d: any) => EXT_SUPORTADAS.test(d.storage_path));
 

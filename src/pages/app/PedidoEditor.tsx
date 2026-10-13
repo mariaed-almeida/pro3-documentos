@@ -580,6 +580,28 @@ const PedidoEditor = () => {
               )}
             </div>
           )}
+          {canOperate && pedido.status === "cancelado" && pedido.id && (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">PI cancelado. Reativar devolve o PI ao processo e reabre a medição que foi cancelada junto com ele.</p>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={async () => {
+                  try {
+                    await mudarStatusPedido(pedido.id!, "emitido");
+                    setPedido({ ...pedido, status: "emitido" });
+                    qc.invalidateQueries({ queryKey: ["pedidos"] });
+                    qc.invalidateQueries({ queryKey: ["medicoes"] });
+                    toast({ title: "PI reativado" });
+                  } catch (e) {
+                    toast({ title: "Não foi possível reativar", description: (e as Error).message, variant: "destructive" });
+                  }
+                }}
+              >
+                Reativar PI
+              </Button>
+            </div>
+          )}
           {!canOperate && <p className="text-xs text-muted-foreground">Só operadores e administradores editam PIs.</p>}
         </aside>
       </div>

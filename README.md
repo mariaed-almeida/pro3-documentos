@@ -46,7 +46,7 @@ O schema vive em `supabase/migrations`. Todas as tabelas têm RLS ligado; as reg
 | Função | Para quê | Segredos |
 | --- | --- | --- |
 | `analisar-documentacao` | Pré-análise dos documentos pela API da Anthropic. Dispara sozinha quando o envio fica completo. | `ANTHROPIC_API_KEY` |
-| `send-rejection-email` | E-mail ao veículo quando o envio volta com pendência. | `RESEND_API_KEY`, opcional `EMAIL_FROM` |
+| `enviar-email` | Protocolo ao veículo quando o envio chega e devolução com as pendências. Cada tentativa fica em `emails_enviados`. | `RESEND_API_KEY` e `EMAIL_FROM` (ou `resend_api_key` e `email_from` no Vault) |
 | `gerir-usuarios` | Criar contas, desativar e redefinir senha (só admin). | nenhum além dos padrões |
 
 O segredo que autentica o gatilho do banco na função de análise fica no Vault do Postgres (`analise_webhook_secret`).

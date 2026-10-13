@@ -7,5 +7,6 @@ verify_jwt = false
 [functions.gerir-usuarios]
 verify_jwt = true
 
-[functions.send-rejection-email]
-verify_jwt = true
+[functions.enviar-email]
+# Autenticação própria: segredo do webhook (Vault) ou JWT da equipe.
+verify_jwt = false

@@ -23,7 +23,15 @@ interface Props {
   onChanged: () => void;
 }
 
-type Acao = null | { tipo: "liberar" | "pagar" | "devolver" | "cancelar" };
+type Acao = null | { tipo: "liberar" | "pagar" | "retornar" | "cancelar" | "reabrir" };
+
+/** Etapa anterior de cada estágio, e quem pode voltar. */
+const ETAPA_ANTERIOR: Partial<Record<StatusMedicao, { para: StatusMedicao; rotulo: string; quem: "operacao" | "financeiro" | "ambos" }>> = {
+  em_medicao: { para: "aguardando_documentos", rotulo: "Voltar para aguardando documentos", quem: "operacao" },
+  aguardando_liberacao: { para: "em_medicao", rotulo: "Voltar para em medição", quem: "ambos" },
+  liberado: { para: "aguardando_liberacao", rotulo: "Voltar para aguardando liberação", quem: "financeiro" },
+  pago: { para: "liberado", rotulo: "Estornar pagamento (volta a liberado)", quem: "financeiro" },
+};
 
 const hoje = () => new Date().toISOString().slice(0, 10);
 
@@ -56,6 +64,15 @@ const MedicaoSheet = ({ medicao, onClose, onChanged }: Props) => {
   const m = medicao;
   const meta = STATUS_MEDICAO[m.status];
 
+  const anterior = ETAPA_ANTERIOR[m.status];
+  const podeVoltar = !!anterior && (anterior.quem === "operacao" ? canOperate : anterior.quem === "financeiro" ? canFinance : canOperate || canFinance);
+  const podeCancelar =
+    m.status !== "cancelado" &&
+    (isAdmin ||
+      (canOperate && (m.status === "aguardando_documentos" || m.status === "em_medicao")) ||
+      (canFinance && (m.status === "aguardando_liberacao" || m.status === "liberado" || m.status === "pago")));
+  const podeReabrir = m.status === "cancelado" && isAdmin;
+
   const executar = async (para: StatusMedicao, d?: string, detalhe?: string) => {
     setSalvando(true);
     try {
@@ -72,7 +89,8 @@ const MedicaoSheet = ({ medicao, onClose, onChanged }: Props) => {
   };
 
   const evento = (e: (typeof eventos)[number]) => {
-    if (e.tipo === "criada") return "Medição criada";
+    if (e.tipo === "criada") return e.paraStatus ? "Medição criada · " + STATUS_MEDICAO[e.paraStatus].label : "Medição criada";
+    if (e.paraStatus && e.deStatus) return STATUS_MEDICAO[e.deStatus].label + " → " + STATUS_MEDICAO[e.paraStatus].label;
     if (e.paraStatus) return STATUS_MEDICAO[e.paraStatus].label;
     return e.tipo;
   };
@@ -118,6 +136,16 @@ const MedicaoSheet = ({ medicao, onClose, onChanged }: Props) => {
           {m.observacoes && <p className="mt-4 border-l-2 pl-3 text-sm leading-relaxed text-muted-foreground">{m.observacoes}</p>}
 
           <div className="mt-6 space-y-2">
+            {m.status === "aguardando_documentos" && canOperate && (
+              <>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Aguardando o veículo enviar e a equipe aprovar os documentos. Quando forem aprovados, a medição avança sozinha.
+                </p>
+                <Button variant="outline" className="w-full" onClick={() => executar("em_medicao")} disabled={salvando}>
+                  Documentos conferidos por fora: avançar
+                </Button>
+              </>
+            )}
             {m.status === "em_medicao" && canOperate && (
               <>
                 <Button className="w-full" onClick={() => executar("aguardando_liberacao")} disabled={salvando}>
@@ -129,21 +157,26 @@ const MedicaoSheet = ({ medicao, onClose, onChanged }: Props) => {
               </>
             )}
             {m.status === "aguardando_liberacao" && canFinance && (
-              <>
-                <Button className="w-full" onClick={() => setAcao({ tipo: "liberar" })}>
-                  Liberar pagamento
-                </Button>
-                <Button variant="outline" className="w-full" onClick={() => setAcao({ tipo: "devolver" })}>
-                  Devolver para ajuste
-                </Button>
-              </>
+              <Button className="w-full" onClick={() => setAcao({ tipo: "liberar" })}>
+                Liberar pagamento
+              </Button>
             )}
             {m.status === "liberado" && canFinance && (
               <Button className="w-full" onClick={() => setAcao({ tipo: "pagar" })}>
                 Registrar pagamento
               </Button>
             )}
-            {isAdmin && m.status !== "pago" && m.status !== "cancelado" && (
+            {podeVoltar && anterior && (
+              <Button variant="outline" className="w-full" onClick={() => setAcao({ tipo: "retornar" })}>
+                {anterior.rotulo}
+              </Button>
+            )}
+            {podeReabrir && (
+              <Button variant="outline" className="w-full" onClick={() => setAcao({ tipo: "reabrir" })}>
+                Reabrir medição
+              </Button>
+            )}
+            {podeCancelar && (
               <Button variant="ghost" className="w-full text-muted-foreground hover:text-destructive" onClick={() => setAcao({ tipo: "cancelar" })}>
                 Cancelar medição
               </Button>
@@ -151,9 +184,13 @@ const MedicaoSheet = ({ medicao, onClose, onChanged }: Props) => {
             {m.status === "aguardando_liberacao" && !canFinance && (
               <p className="text-xs text-muted-foreground">Aguardando o financeiro liberar o pagamento.</p>
             )}
-            <Button asChild variant="link" className="h-auto w-full justify-start px-0 text-xs">
-              <Link to={`/app/documentos/${m.submissionId}`}>Abrir documentos do PI</Link>
-            </Button>
+            {m.submissionId ? (
+              <Button asChild variant="link" className="h-auto w-full justify-start px-0 text-xs">
+                <Link to={`/app/documentos/${m.submissionId}`}>Abrir documentos do PI</Link>
+              </Button>
+            ) : (
+              <p className="text-xs text-muted-foreground">O veículo ainda não enviou documentos.</p>
+            )}
           </div>
 
           {m.pedidoId && (
@@ -222,14 +259,20 @@ const MedicaoSheet = ({ medicao, onClose, onChanged }: Props) => {
               </DialogFooter>
             </>
           )}
-          {(acao?.tipo === "devolver" || acao?.tipo === "cancelar") && (
+          {(acao?.tipo === "retornar" || acao?.tipo === "cancelar" || acao?.tipo === "reabrir") && (
             <>
               <DialogHeader>
-                <DialogTitle>{acao.tipo === "devolver" ? "Devolver para ajuste" : "Cancelar medição"}</DialogTitle>
+                <DialogTitle>
+                  {acao.tipo === "retornar" ? anterior?.rotulo : acao.tipo === "cancelar" ? "Cancelar medição" : "Reabrir medição"}
+                </DialogTitle>
                 <DialogDescription>
-                  {acao.tipo === "devolver"
-                    ? "A medição volta ao operador com o motivo abaixo."
-                    : "A medição deixa de contar nos totais. Essa ação não pode ser desfeita."}
+                  {acao.tipo === "retornar"
+                    ? "A medição volta à etapa anterior e o motivo fica no histórico."
+                    : acao.tipo === "cancelar"
+                      ? m.status === "pago"
+                        ? "O pagamento registrado é cancelado e a medição deixa de contar nos totais. O histórico fica guardado."
+                        : "A medição deixa de contar nos totais. Um administrador pode reabri-la depois."
+                      : "A medição volta ao processo, na etapa que os documentos permitem."}
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-1.5">
@@ -241,7 +284,13 @@ const MedicaoSheet = ({ medicao, onClose, onChanged }: Props) => {
                 <Button
                   variant={acao.tipo === "cancelar" ? "destructive" : "default"}
                   disabled={salvando || !motivo.trim()}
-                  onClick={() => executar(acao.tipo === "devolver" ? "em_medicao" : "cancelado", undefined, motivo.trim())}
+                  onClick={() =>
+                    executar(
+                      acao.tipo === "retornar" ? anterior!.para : acao.tipo === "cancelar" ? "cancelado" : "em_medicao",
+                      undefined,
+                      motivo.trim(),
+                    )
+                  }
                 >
                   {salvando && <Loader2 className="animate-spin" />} Confirmar
                 </Button>

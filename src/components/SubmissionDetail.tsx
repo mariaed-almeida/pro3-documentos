@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
   AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Download, ExternalLink, Eye, FileText,
@@ -220,6 +221,45 @@ const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
     }
   };
 
+  const qc = useQueryClient();
+  const { data: emails = [] } = useQuery({
+    queryKey: ["emails-enviados", submission.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("emails_enviados")
+        .select("id, tipo, para, status, erro, created_at")
+        .eq("submission_id", submission.id)
+        .order("created_at", { ascending: false });
+      return data ?? [];
+    },
+  });
+
+  /** Envia o e-mail ao veículo e devolve uma mensagem pronta quando não der certo. */
+  const enviarEmail = async (corpo: { tipo: "protocolo" } | { tipo: "devolucao"; motivo: string }): Promise<string | null> => {
+    const { data, error } = await supabase.functions.invoke("enviar-email", { body: { submissionId: submission.id, ...corpo } });
+    qc.invalidateQueries({ queryKey: ["emails-enviados", submission.id] });
+    if (!error && data?.success) return null;
+    let corpoErro = data;
+    const ctx = (error as { context?: Response } | null)?.context;
+    if (ctx) {
+      try {
+        corpoErro = await ctx.json();
+      } catch {
+        /* sem corpo legível */
+      }
+    }
+    if (corpoErro?.code === "email_nao_configurado") return "O serviço de e-mail ainda não está configurado.";
+    return corpoErro?.error ?? "Não foi possível enviar o e-mail.";
+  };
+
+  const [reenviando, setReenviando] = useState(false);
+  const reenviarProtocolo = async () => {
+    setReenviando(true);
+    const falha = await enviarEmail({ tipo: "protocolo" });
+    setReenviando(false);
+    toast(falha ? { title: "E-mail não enviado", description: falha, variant: "destructive" } : { title: "Protocolo reenviado ao veículo" });
+  };
+
   const handleRejectConfirm = async () => {
     if (!rejectMessage.trim()) {
       toast({ title: "Informe o motivo da rejeição", variant: "destructive" });
@@ -234,17 +274,22 @@ const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
         .eq("id", submission.id);
       await onStatusUpdate(submission.id, "em_revisao");
 
-      const { error: emailError } = await supabase.functions.invoke("send-rejection-email", {
-        body: { submissionId: submission.id, motivo: rejectMessage.trim() },
-      });
-      if (emailError) throw emailError;
-      toast({ title: "E-mail de correção enviado ao veículo" });
+      const falha = await enviarEmail({ tipo: "devolucao", motivo: rejectMessage.trim() });
+      if (falha) {
+        toast({
+          title: "Devolvido, mas o e-mail não foi enviado",
+          description: falha + " O status e as pendências ficaram registrados; avise o veículo por outro meio.",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "E-mail de correção enviado ao veículo" });
+      }
       setShowRejectModal(false);
       setRejectMessage("");
       setPreenchidoPelaIa(false);
     } catch (err) {
-      console.error("Error sending rejection:", err);
-      toast({ title: "Status atualizado, mas houve erro ao enviar e-mail", variant: "destructive" });
+      console.error("Erro ao devolver o envio:", err);
+      toast({ title: "Não foi possível devolver o envio", description: (err as Error).message, variant: "destructive" });
       setShowRejectModal(false);
     } finally {
       setSendingReject(false);
@@ -443,6 +488,37 @@ const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
               <p className="mt-1 text-xs text-muted-foreground">Ao aprovar, a medição é criada com os valores do PI.</p>
             </Panel>
           )}
+
+          <Panel
+            title="E-mails ao veículo"
+            actions={
+              canOperate && (
+                <Button variant="outline" size="sm" onClick={reenviarProtocolo} disabled={reenviando}>
+                  {reenviando && <Loader2 className="animate-spin" />} Reenviar protocolo
+                </Button>
+              )
+            }
+          >
+            {emails.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhum e-mail enviado ainda.</p>
+            ) : (
+              <ul className="divide-y text-sm">
+                {emails.map((e) => (
+                  <li key={e.id} className="py-2 first:pt-0 last:pb-0">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span>{e.tipo === "protocolo" ? "Protocolo" : "Devolução"}</span>
+                      <span className={cn("text-xs", e.status === "enviado" ? "text-success" : "text-destructive")}>
+                        {e.status === "enviado" ? "enviado" : e.status === "nao_configurado" ? "sem serviço de e-mail" : "falhou"}
+                      </span>
+                    </div>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {e.para} · {formatDateTime(e.created_at)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
 
           <Panel title="Veículo e contato">
             <dl className="space-y-3 text-sm">

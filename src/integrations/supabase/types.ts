@@ -333,6 +333,22 @@ export type Database = {
         };
         Relationships: [Rel<{ referencedRelation: "pedidos_insercao" }>];
       };
+      emails_enviados: {
+        Row: {
+          assunto: string;
+          created_at: string;
+          erro: string | null;
+          id: string;
+          para: string;
+          provider_id: string | null;
+          status: string;
+          submission_id: string | null;
+          tipo: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [Rel<{ referencedRelation: "submissions" }>];
+      };
       campanha_documentos: {
         Row: {
           campanha_id: string;
@@ -384,7 +400,7 @@ export type Database = {
           periodo_inicio: string | null;
           previsao_pagamento: string | null;
           status: Database["public"]["Enums"]["status_medicao"];
-          submission_id: string;
+          submission_id: string | null;
           updated_at: string;
           valor_bruto: number;
           valor_liquido: number;
@@ -397,7 +413,7 @@ export type Database = {
           observacoes?: string | null;
           periodo_fim?: string | null;
           periodo_inicio?: string | null;
-          submission_id: string;
+          submission_id?: string | null;
           valor_bruto: number;
           pedido_id?: string | null;
           vencimento?: string | null;
@@ -699,7 +715,7 @@ export type Database = {
     };
     Enums: {
       app_role: "operador" | "financeiro" | "admin";
-      status_medicao: "em_medicao" | "aguardando_liberacao" | "liberado" | "pago" | "cancelado";
+      status_medicao: "aguardando_documentos" | "em_medicao" | "aguardando_liberacao" | "liberado" | "pago" | "cancelado";
     };
     CompositeTypes: { [_ in never]: never };
   };

@@ -5,7 +5,7 @@ export type StatusMedicao = Database["public"]["Enums"]["status_medicao"];
 
 export interface Medicao {
   id: string;
-  submissionId: string;
+  submissionId: string | null;
   valorBruto: number;
   comissao: number;
   valorLiquido: number;
@@ -28,9 +28,15 @@ export interface Medicao {
   cidade: string;
 }
 
-export const STATUS_MEDICAO_ORDER: StatusMedicao[] = ["em_medicao", "aguardando_liberacao", "liberado", "pago", "cancelado"];
+export const STATUS_MEDICAO_ORDER: StatusMedicao[] = ["aguardando_documentos", "em_medicao", "aguardando_liberacao", "liberado", "pago", "cancelado"];
 
 export const STATUS_MEDICAO: Record<StatusMedicao, { label: string; hint: string; badge: string; chart: string }> = {
+  aguardando_documentos: {
+    label: "Aguardando documentos",
+    hint: "PI emitido, documentos ainda não aprovados",
+    badge: "bg-muted text-muted-foreground border-border",
+    chart: "hsl(216 40% 82%)",
+  },
   em_medicao: {
     label: "Em medição",
     hint: "Valores em conferência",
@@ -74,7 +80,7 @@ export interface MedicaoEvento {
 }
 
 const SELECT =
-  "id, submission_id, valor_bruto, comissao_agencia, valor_liquido, periodo_inicio, periodo_fim, numero_nf, observacoes, status, enviado_em, liberado_em, previsao_pagamento, pago_em, created_at, pedido_id, vencimento, submissions(cliente, campanha, numero_pi, nome_veiculo, cidade)";
+  "id, submission_id, valor_bruto, comissao_agencia, valor_liquido, periodo_inicio, periodo_fim, numero_nf, observacoes, status, enviado_em, liberado_em, previsao_pagamento, pago_em, created_at, pedido_id, vencimento, submissions(cliente, campanha, numero_pi, nome_veiculo, cidade), pedidos_insercao(numero, campanha, clientes(nome), veiculos(nome, municipio, uf))";
 
 export async function listMedicoes(): Promise<Medicao[]> {
   const { data, error } = await supabase.from("medicoes").select(SELECT).order("created_at", { ascending: false });
@@ -97,11 +103,11 @@ export async function listMedicoes(): Promise<Medicao[]> {
     createdAt: m.created_at,
     pedidoId: m.pedido_id,
     vencimento: m.vencimento,
-    cliente: m.submissions?.cliente ?? "",
-    campanha: m.submissions?.campanha ?? "",
-    numeroPi: m.submissions?.numero_pi ?? "",
-    nomeVeiculo: m.submissions?.nome_veiculo ?? "",
-    cidade: m.submissions?.cidade ?? "",
+    cliente: m.submissions?.cliente ?? m.pedidos_insercao?.clientes?.nome ?? "",
+    campanha: m.submissions?.campanha ?? m.pedidos_insercao?.campanha ?? "",
+    numeroPi: m.submissions?.numero_pi ?? String(m.pedidos_insercao?.numero ?? ""),
+    nomeVeiculo: m.pedidos_insercao?.veiculos?.nome ?? m.submissions?.nome_veiculo ?? "",
+    cidade: m.submissions?.cidade ?? [m.pedidos_insercao?.veiculos?.municipio, m.pedidos_insercao?.veiculos?.uf].filter(Boolean).join(" - "),
   }));
 }
 
