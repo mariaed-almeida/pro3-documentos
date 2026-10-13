@@ -1,99 +1,108 @@
-import { useNavigate } from "react-router-dom";
-import { CheckCircle2, FileText, ArrowLeft, Printer } from "lucide-react";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Submission } from "@/lib/types";
+import { useToast } from "@/hooks/use-toast";
+import {
+  baixarProtocoloPdf,
+  dadosDoComprovante,
+  gerarProtocolo,
+  listarDocumentosRecebidos,
+} from "@/lib/protocolo-pdf";
+import logoPro3 from "@/assets/logo-pro3.png";
 
 interface Props {
   submission: Submission;
 }
 
 const SubmissionReceipt = ({ submission }: Props) => {
-  const navigate = useNavigate();
-  const date = new Date(submission.dataEnvio);
+  const { toast } = useToast();
+  const [gerando, setGerando] = useState(false);
+  const protocolo = gerarProtocolo(submission);
+  const dados = dadosDoComprovante(submission);
+  const documentos = listarDocumentosRecebidos(submission);
 
-  const docLabels: Record<string, string> = {
-    piAssinado: "PI Assinado",
-    declaracaoSimplesNacional: "Declaração Simples Nacional",
-    comprovantesExibicao: "Comprovantes de Exibição",
-    declaracaoArtigo299: "Declaração do Artigo 299",
-    tabelaPrecoAssinada: "Tabela de Preço Assinada",
+  const salvarPdf = async () => {
+    setGerando(true);
+    try {
+      await baixarProtocoloPdf(submission);
+    } catch {
+      toast({ title: "Não foi possível gerar o PDF", description: "Tente novamente em instantes.", variant: "destructive" });
+    } finally {
+      setGerando(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
-      <div className="bg-card rounded-lg border max-w-lg w-full p-8 animate-fade-in">
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 className="h-8 w-8 text-success" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground">Documentação Enviada!</h1>
-          <p className="text-muted-foreground mt-1">Comprovante de envio</p>
+    <div className="min-h-screen bg-background">
+      <header className="border-b">
+        <div className="mx-auto flex max-w-[42rem] items-center px-5 py-4">
+          <img src={logoPro3} alt="Pró3 Comunicação" className="h-9 w-auto" />
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-[42rem] px-5 pb-20 pt-10">
+        <p className="eyebrow mb-2">Documentos recebidos</p>
+        <h1 className="text-3xl">Comprovante de envio</h1>
+
+        <div className="mt-8 border-y py-5">
+          <p className="eyebrow">Número de protocolo</p>
+          <p className="num mt-1 break-all font-serif text-3xl tracking-tight sm:text-4xl" aria-label={`Protocolo ${protocolo}`}>
+            {protocolo}
+          </p>
         </div>
 
-        <div className="border rounded-lg p-4 space-y-3 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Protocolo</span>
-            <span className="font-mono font-semibold text-foreground">{submission.id.slice(0, 8).toUpperCase()}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Data/Hora</span>
-            <span className="text-foreground">{date.toLocaleString("pt-BR")}</span>
-          </div>
-          <div className="border-t pt-3 flex justify-between">
-            <span className="text-muted-foreground">Cliente</span>
-            <span className="text-foreground font-medium">{submission.cliente}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Campanha</span>
-            <span className="text-foreground text-right max-w-[200px]">{submission.campanha}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">PI Nº</span>
-            <span className="text-foreground font-medium">{submission.numeroPi}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Veículo</span>
-            <span className="text-foreground">{submission.nomeVeiculo}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Tipo</span>
-            <span className="text-foreground">{submission.tipoVeiculo === "Outro" ? submission.outroTipo : submission.tipoVeiculo}</span>
-          </div>
-
-          <div className="border-t pt-3">
-            <p className="text-muted-foreground mb-2">Documentos enviados:</p>
-            <div className="space-y-1">
-              {Object.entries(submission.documentos).map(([key, val]) => {
-                if (!val || (Array.isArray(val) && val.length === 0)) return null;
-                const label = docLabels[key] || key;
-                if (Array.isArray(val)) {
-                  return val.map((v, i) => (
-                    <div key={`${key}-${i}`} className="flex items-center gap-2">
-                      <FileText className="h-3 w-3 text-success" />
-                      <span className="text-foreground text-xs">Certidão {i + 1}: {v}</span>
-                    </div>
-                  ));
-                }
-                return (
-                  <div key={key} className="flex items-center gap-2">
-                    <FileText className="h-3 w-3 text-success" />
-                    <span className="text-foreground text-xs">{label}: {val}</span>
-                  </div>
-                );
-              })}
+        <dl className="divide-y border-b">
+          {dados.map(({ rotulo, valor }) => (
+            <div key={rotulo} className="grid gap-0.5 py-3 text-sm sm:grid-cols-[11rem_1fr] sm:gap-4">
+              <dt className="text-muted-foreground">{rotulo}</dt>
+              <dd className="break-words">{valor}</dd>
             </div>
-          </div>
-        </div>
+          ))}
+        </dl>
 
-        <div className="flex gap-3 mt-6">
-          <Button variant="outline" className="flex-1 gap-2" onClick={() => window.print()}>
-            <Printer className="h-4 w-4" /> Imprimir
+        <section className="mt-10" aria-labelledby="docs-recebidos">
+          <h2 id="docs-recebidos" className="text-xl">Documentos recebidos</h2>
+          {documentos.length === 0 ? (
+            <p className="mt-3 text-sm text-muted-foreground">Nenhum documento registrado.</p>
+          ) : (
+            <ol className="mt-3 divide-y border-y">
+              {documentos.map(({ rotulo, arquivo }, i) => (
+                <li key={`${rotulo}-${i}`} className="grid grid-cols-[1.75rem_1fr] gap-x-2 py-3 text-sm sm:grid-cols-[1.75rem_15rem_1fr]">
+                  <span className="num text-xs leading-5 text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="font-medium">{rotulo}</span>
+                  <span className="col-start-2 [overflow-wrap:anywhere] text-muted-foreground sm:col-start-3">{arquivo}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+
+        <p className="mt-8 border-l-2 pl-3 text-sm text-muted-foreground">
+          Guarde este comprovante. A Pró3 confere a documentação e avisa por e-mail se algo precisar de correção.
+        </p>
+
+        <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+          <Button onClick={salvarPdf} disabled={gerando}>
+            {gerando ? <Loader2 className="animate-spin" aria-hidden /> : <Download aria-hidden />}
+            {gerando ? "Gerando PDF" : "Salvar como PDF"}
           </Button>
-          <Button className="flex-1" onClick={() => navigate("/")}>
+          <Link
+            to="/"
+            className="rounded-sm text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
             Voltar ao início
-          </Button>
+          </Link>
+          <button
+            type="button"
+            onClick={() => window.location.assign("/veiculo")}
+            className="rounded-sm text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Enviar outro documento
+          </button>
         </div>
-      </div>
+      </main>
     </div>
   );
 };

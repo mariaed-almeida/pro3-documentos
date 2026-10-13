@@ -18,6 +18,9 @@ const Analises = lazy(() => import("./pages/app/Analises.tsx"));
 const Clientes = lazy(() => import("./pages/app/Clientes.tsx"));
 const Campanhas = lazy(() => import("./pages/app/Campanhas.tsx"));
 const Veiculos = lazy(() => import("./pages/app/Veiculos.tsx"));
+const Faturamento = lazy(() => import("./pages/app/Faturamento.tsx"));
+const Gerencial = lazy(() => import("./pages/app/Gerencial.tsx"));
+const Usuarios = lazy(() => import("./pages/app/Usuarios.tsx"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
@@ -41,11 +44,14 @@ const App = () => (
             <Route path="documentos" element={<Documentos />} />
             <Route path="documentos/:id" element={<DocumentoDetalhe />} />
             <Route path="aprovacoes" element={<Aprovacoes />} />
+            <Route path="faturamento" element={<Faturamento />} />
+            <Route path="gerencial" element={<Gerencial />} />
             <Route path="analises" element={<Analises />} />
             <Route path="cadastros" element={<Navigate to="/app/cadastros/clientes" replace />} />
             <Route path="cadastros/clientes" element={<Clientes />} />
             <Route path="cadastros/campanhas" element={<Campanhas />} />
             <Route path="cadastros/veiculos" element={<Veiculos />} />
+            <Route path="cadastros/usuarios" element={<Usuarios />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

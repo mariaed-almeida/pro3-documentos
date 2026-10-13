@@ -15,6 +15,96 @@ export type Database = {
         Update: { ativa?: boolean; cliente?: string; created_at?: string; id?: string; nome?: string };
         Relationships: [Rel<{ referencedRelation: "clientes" }>];
       };
+      campanha_documentos: {
+        Row: {
+          campanha_id: string;
+          doc_type: string;
+          obrigatorio: boolean;
+          ordem: number;
+          regime: string;
+          tipos_veiculo: string[] | null;
+        };
+        Insert: {
+          campanha_id: string;
+          doc_type: string;
+          obrigatorio?: boolean;
+          ordem?: number;
+          regime?: string;
+          tipos_veiculo?: string[] | null;
+        };
+        Update: {
+          campanha_id?: string;
+          doc_type?: string;
+          obrigatorio?: boolean;
+          ordem?: number;
+          regime?: string;
+          tipos_veiculo?: string[] | null;
+        };
+        Relationships: [Rel<{ referencedRelation: "campanhas" }>, Rel<{ referencedRelation: "tipos_documento" }>];
+      };
+      tipos_documento: {
+        Row: { codigo: string; created_at: string; descricao: string | null; modelo_url: string | null; nome: string; ordem: number };
+        Insert: { codigo: string; created_at?: string; descricao?: string | null; modelo_url?: string | null; nome: string; ordem?: number };
+        Update: { codigo?: string; created_at?: string; descricao?: string | null; modelo_url?: string | null; nome?: string; ordem?: number };
+        Relationships: [];
+      };
+      medicoes: {
+        Row: {
+          comissao_agencia: number;
+          created_at: string;
+          criado_por: string | null;
+          enviado_em: string | null;
+          enviado_por: string | null;
+          id: string;
+          liberado_em: string | null;
+          liberado_por: string | null;
+          numero_nf: string | null;
+          observacoes: string | null;
+          pago_em: string | null;
+          pago_por: string | null;
+          periodo_fim: string | null;
+          periodo_inicio: string | null;
+          previsao_pagamento: string | null;
+          status: Database["public"]["Enums"]["status_medicao"];
+          submission_id: string;
+          updated_at: string;
+          valor_bruto: number;
+          valor_liquido: number;
+        };
+        Insert: {
+          comissao_agencia?: number;
+          numero_nf?: string | null;
+          observacoes?: string | null;
+          periodo_fim?: string | null;
+          periodo_inicio?: string | null;
+          submission_id: string;
+          valor_bruto: number;
+        };
+        Update: {
+          comissao_agencia?: number;
+          numero_nf?: string | null;
+          observacoes?: string | null;
+          periodo_fim?: string | null;
+          periodo_inicio?: string | null;
+          valor_bruto?: number;
+        };
+        Relationships: [Rel<{ referencedRelation: "submissions" }>];
+      };
+      medicao_eventos: {
+        Row: {
+          ator_id: string | null;
+          created_at: string;
+          de_status: Database["public"]["Enums"]["status_medicao"] | null;
+          detalhe: string | null;
+          id: string;
+          medicao_id: string;
+          para_status: Database["public"]["Enums"]["status_medicao"] | null;
+          tipo: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [Rel<{ referencedRelation: "medicoes" }>];
+      };
       clientes: {
         Row: {
           ativo: boolean;
@@ -202,9 +292,18 @@ export type Database = {
     Views: { [_ in never]: never };
     Functions: {
       concluir_envio: { Args: { p_id: string }; Returns: boolean };
+      criar_medicao: {
+        Args: { p_submission: string; p_valor_bruto: number; p_comissao?: number; p_inicio?: string; p_fim?: string; p_nf?: string; p_obs?: string };
+        Returns: string;
+      };
+      mudar_status_medicao: {
+        Args: { p_id: string; p_para: Database["public"]["Enums"]["status_medicao"]; p_data?: string; p_detalhe?: string };
+        Returns: undefined;
+      };
     };
     Enums: {
       app_role: "operador" | "financeiro" | "admin";
+      status_medicao: "em_medicao" | "aguardando_liberacao" | "liberado" | "pago" | "cancelado";
     };
     CompositeTypes: { [_ in never]: never };
   };

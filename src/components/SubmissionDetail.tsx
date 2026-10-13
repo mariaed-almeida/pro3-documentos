@@ -14,6 +14,7 @@ import Panel from "@/components/app/Panel";
 import { Submission, StatusDocumento } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useRoles } from "@/hooks/use-roles";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import JSZip from "jszip";
@@ -206,6 +207,7 @@ const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
     }
   };
 
+  const { canOperate } = useRoles();
   const decidido = submission.status === "aprovado" || submission.status === "cancelado";
 
   const achadoVisual = (r: string) =>
@@ -347,7 +349,7 @@ const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
                 <p className="text-sm leading-relaxed">{submission.observacoes}</p>
               </div>
             )}
-            <div className="space-y-2">
+            <fieldset disabled={!canOperate} className="space-y-2 disabled:opacity-60">
               <Button className="w-full" onClick={() => handleStatusClick("aprovado")} disabled={submission.status === "aprovado"}>
                 <CheckCircle2 /> {submission.status === "aprovado" ? "Aprovado" : "Aprovar documentação"}
               </Button>
@@ -373,7 +375,8 @@ const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
                   <Ban /> Cancelar PI
                 </Button>
               )}
-            </div>
+            </fieldset>
+            {!canOperate && <p className="mt-3 text-xs text-muted-foreground">Só operadores e administradores decidem sobre a documentação.</p>}
           </Panel>
 
           <Panel title="Veículo e contato">

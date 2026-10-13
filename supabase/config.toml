@@ -4,5 +4,8 @@ project_id = "bkirbcoixrjuzfsjqlvt"
 # Autenticação própria: segredo do webhook (Vault) ou JWT de usuário da equipe.
 verify_jwt = false
 
+[functions.gerir-usuarios]
+verify_jwt = true
+
 [functions.send-rejection-email]
 verify_jwt = true

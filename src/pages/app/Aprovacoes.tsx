@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useChangeStatus, useSubmissions } from "@/hooks/use-submissions";
 import { useToast } from "@/hooks/use-toast";
+import { useRoles } from "@/hooks/use-roles";
 import { daysSince, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Submission } from "@/lib/types";
@@ -29,6 +30,7 @@ const alertas = (s: Submission) => s.analiseIa?.achados.filter((a) => a.resultad
 const Aprovacoes = () => {
   const { data: submissions = [], isLoading } = useSubmissions();
   const changeStatus = useChangeStatus();
+  const { canOperate } = useRoles();
   const { toast } = useToast();
   const [aba, setAba] = useState<Aba>("recebido");
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
@@ -44,7 +46,7 @@ const Aprovacoes = () => {
   }, [submissions, aba]);
 
   const contagem = (id: Aba) => submissions.filter((s) => s.status === id).length;
-  const selecionaveis = aba === "recebido" ? porAba : [];
+  const selecionaveis = aba === "recebido" && canOperate ? porAba : [];
   const todos = selecionaveis.length > 0 && selecionaveis.every((s) => selecionados.has(s.id));
   const selecionadosLista = porAba.filter((s) => selecionados.has(s.id));
   const comAlerta = selecionadosLista.filter((s) => alertas(s) > 0).length;
@@ -177,7 +179,7 @@ const Aprovacoes = () => {
                     <Button asChild variant="outline" size="sm">
                       <Link to={`/app/documentos/${s.id}`}>Conferir</Link>
                     </Button>
-                    {aba === "recebido" && nAlertas === 0 && (
+                    {aba === "recebido" && canOperate && nAlertas === 0 && (
                       <Button size="sm" onClick={() => aprovar([s.id])} disabled={salvando}>
                         Aprovar
                       </Button>

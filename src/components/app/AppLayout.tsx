@@ -1,13 +1,15 @@
 import { Suspense, useEffect, useState } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  BarChart3, Building2, ClipboardCheck, ExternalLink, FileStack, LayoutDashboard,
+  BarChart3, Building2, ClipboardCheck, ExternalLink, FileStack, LayoutDashboard, Landmark, Receipt, UserCog,
   Loader2, LogOut, Megaphone, Menu, Radio,
 } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
 import { useSubmissions } from "@/hooks/use-submissions";
+import { useMedicoes } from "@/hooks/use-medicoes";
+import { ROLE_LABEL, useRoles } from "@/hooks/use-roles";
 import { cn } from "@/lib/utils";
 import { initials } from "@/lib/format";
 import logoPro3 from "@/assets/logo-pro3.png";
@@ -25,17 +27,23 @@ const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => {
   const session = useSession();
   const { data: submissions = [] } = useSubmissions();
   const pendentes = submissions.filter((s) => s.status === "recebido").length;
+  const { data: medicoes = [] } = useMedicoes();
+  const { roles, isAdmin, canFinance } = useRoles();
+  const faturamentoPendente = medicoes.filter((m) => (canFinance ? m.status === "aguardando_liberacao" : m.status === "em_medicao")).length;
 
   const principal: NavItem[] = [
     { to: "/app", label: "Visão geral", icon: LayoutDashboard, end: true },
     { to: "/app/documentos", label: "Documentos", icon: FileStack },
     { to: "/app/aprovacoes", label: "Aprovações", icon: ClipboardCheck, badge: pendentes },
+    { to: "/app/faturamento", label: "Faturamento", icon: Receipt, badge: faturamentoPendente },
+    { to: "/app/gerencial", label: "Visão gerencial", icon: Landmark },
     { to: "/app/analises", label: "Análises", icon: BarChart3 },
   ];
   const cadastros: NavItem[] = [
     { to: "/app/cadastros/clientes", label: "Clientes", icon: Building2 },
     { to: "/app/cadastros/campanhas", label: "Campanhas", icon: Megaphone },
     { to: "/app/cadastros/veiculos", label: "Veículos", icon: Radio },
+    ...(isAdmin ? [{ to: "/app/cadastros/usuarios", label: "Usuários", icon: UserCog }] : []),
   ];
 
   const email = session?.user.email ?? "";
@@ -101,7 +109,7 @@ const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => {
           </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-medium">{email || "Operador"}</p>
-            <p className="text-[11px] text-sidebar-muted">Operador</p>
+            <p className="text-[11px] text-sidebar-muted">{roles.length ? roles.map((r) => ROLE_LABEL[r]).join(", ") : "Sem papel atribuído"}</p>
           </div>
           <button
             onClick={handleLogout}
@@ -121,6 +129,7 @@ const AppLayout = () => {
   const session = useSession();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { isLoading: carregandoPapeis, hasAnyRole } = useRoles();
 
   useEffect(() => setMobileOpen(false), [location.pathname]);
 
@@ -133,6 +142,24 @@ const AppLayout = () => {
   }
   if (session === null) {
     return <Navigate to={`/operador/login?next=${encodeURIComponent(location.pathname)}`} replace />;
+  }
+
+  if (!carregandoPapeis && !hasAnyRole) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
+        <img src={logoPro3} alt="Pró3 Comunicação" className="mb-8 h-10 w-auto" />
+        <h1 className="text-3xl">Acesso ainda não liberado</h1>
+        <p className="mt-3 max-w-sm text-sm text-muted-foreground">
+          Sua conta existe, mas nenhum administrador atribuiu um papel a ela. Peça a liberação à equipe da Pró3.
+        </p>
+        <button
+          onClick={() => supabase.auth.signOut()}
+          className="mt-6 text-sm font-medium text-primary underline-offset-4 hover:underline"
+        >
+          Sair
+        </button>
+      </div>
+    );
   }
 
   return (
