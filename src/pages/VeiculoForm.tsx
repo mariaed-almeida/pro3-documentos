@@ -19,6 +19,7 @@ import logoPro3 from "@/assets/logo-pro3.png";
 
 import { CLIENTES, TIPOS_VEICULO, ORIENTACOES_CLIENTE } from "@/lib/clientes";
 import { useClientes } from "@/hooks/use-clientes";
+import { supabase } from "@/integrations/supabase/client";
 
 const ALLOWED_EXT = [".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx"];
 const ACCEPT = ALLOWED_EXT.join(",");
@@ -98,11 +99,40 @@ const VeiculoForm = () => {
     });
   };
 
+  // PI já emitido pela agência: preenche campanha, veículo, tipo e cidade a partir do número.
+  const [piEncontrado, setPiEncontrado] = useState<{ campanha: string; nome_veiculo: string; tipo_veiculo: string; praca: string | null } | null>(null);
+  useEffect(() => {
+    setPiEncontrado(null);
+    const numero = numeroPi.trim();
+    if (!cliente || numero.length < 2) return;
+    let vivo = true;
+    const t = setTimeout(async () => {
+      const { data } = await supabase.rpc("consultar_pi", { p_cliente: cliente, p_numero: numero });
+      if (vivo && data && typeof data === "object" && !Array.isArray(data)) {
+        setPiEncontrado(data as { campanha: string; nome_veiculo: string; tipo_veiculo: string; praca: string | null });
+      }
+    }, 450);
+    return () => {
+      vivo = false;
+      clearTimeout(t);
+    };
+  }, [cliente, numeroPi]);
+
   const [campanhasDisponiveis, setCampanhasDisponiveis] = useState<string[]>([]);
   useEffect(() => {
     if (cliente) getActiveCampaigns(cliente).then(setCampanhasDisponiveis);
     else setCampanhasDisponiveis([]);
   }, [cliente]);
+
+  useEffect(() => {
+    if (!piEncontrado) return;
+    // Só completa o que o veículo ainda não preencheu; tudo continua editável.
+    if (!campanha && campanhasDisponiveis.includes(piEncontrado.campanha)) setCampanha(piEncontrado.campanha);
+    if (!nomeVeiculo) setNomeVeiculo(piEncontrado.nome_veiculo);
+    if (!tipoVeiculo && (TIPOS_VEICULO as string[]).includes(piEncontrado.tipo_veiculo)) setTipoVeiculo(piEncontrado.tipo_veiculo as TipoVeiculo);
+    if (!cidade && piEncontrado.praca) setCidade(piEncontrado.praca);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [piEncontrado, campanhasDisponiveis]);
 
   // Regras da campanha, vindas do banco.
   const regrasQuery = useQuery({
@@ -303,15 +333,18 @@ const VeiculoForm = () => {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
+                  <Label htmlFor="pi">Número do PI</Label>
+                  <Input id="pi" value={numeroPi} onChange={(e) => setNumeroPi(e.target.value)} aria-describedby="pi-ajuda" />
+                  <p id="pi-ajuda" className="min-h-4 text-xs text-muted-foreground" aria-live="polite">
+                    {piEncontrado ? "PI encontrado: os dados abaixo foram preenchidos. Confira e corrija se precisar." : ""}
+                  </p>
+                </div>
+                <div className="space-y-1.5">
                   <Label htmlFor="campanha">Campanha</Label>
                   <Select value={campanha} onValueChange={setCampanha} disabled={!cliente}>
                     <SelectTrigger id="campanha"><SelectValue placeholder="Selecione a campanha" /></SelectTrigger>
                     <SelectContent>{campanhasDisponiveis.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="pi">Número do PI</Label>
-                  <Input id="pi" value={numeroPi} onChange={(e) => setNumeroPi(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="veiculo">Nome do veículo</Label>

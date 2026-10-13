@@ -687,6 +687,7 @@ export type Database = {
     Views: { [_ in never]: never };
     Functions: {
       concluir_envio: { Args: { p_id: string }; Returns: boolean };
+      consultar_pi: { Args: { p_cliente: string; p_numero: string }; Returns: Json };
       criar_medicao: {
         Args: { p_submission: string; p_valor_bruto: number; p_comissao?: number; p_inicio?: string; p_fim?: string; p_nf?: string; p_obs?: string };
         Returns: string;
