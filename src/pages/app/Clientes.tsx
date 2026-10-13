@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, Loader2, Plus, Search } from "lucide-react";
+import DadosReceita, { type ViewReceita } from "@/components/app/DadosReceita";
+import { consultarCnpj, cnpjValido, enderecoLinha, limparLogradouro, mascararCnpj, soDigitos, type DadosCnpj } from "@/lib/cnpj";
 import PageHeader from "@/components/app/PageHeader";
 import EmptyState from "@/components/app/EmptyState";
 import { Button } from "@/components/ui/button";
@@ -18,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getCampaigns } from "@/lib/campaigns";
 import { formatBRL } from "@/lib/money";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { cn } from "@/lib/utils";
 
 const linhas = (v: string) => v.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -30,10 +33,12 @@ interface FormState {
   textoObrigatorioNf: string;
   contratos: string;
   regrasNf: string;
+  telefone: string;
+  email: string;
   ativo: boolean;
 }
 
-const vazio: FormState = { nome: "", cnpj: "", enderecoPostal: "", textoObrigatorioNf: "", contratos: "", regrasNf: "", ativo: true };
+const vazio: FormState = { nome: "", cnpj: "", enderecoPostal: "", textoObrigatorioNf: "", contratos: "", regrasNf: "", telefone: "", email: "", ativo: true };
 
 const deCliente = (c: ClienteDb): FormState => ({
   nome: c.nome,
@@ -42,7 +47,48 @@ const deCliente = (c: ClienteDb): FormState => ({
   textoObrigatorioNf: c.textoObrigatorioNf ?? "",
   contratos: c.contratoInfo.join("\n"),
   regrasNf: c.observacoesNf.join("\n"),
+  telefone: c.telefone ?? "",
+  email: c.email ?? "",
   ativo: c.ativo,
+});
+
+const viewDoCliente = (c: ClienteDb): ViewReceita | null =>
+  c.razaoSocial
+    ? {
+        razaoSocial: c.razaoSocial,
+        nomeFantasia: c.nomeFantasia,
+        situacao: c.situacaoCadastral,
+        dataSituacao: c.dataSituacao,
+        dataAbertura: c.dataAbertura,
+        naturezaJuridica: c.naturezaJuridica,
+        porte: c.porte,
+        cnaePrincipal: c.cnaePrincipal,
+        cnaesSecundarios: c.cnaesSecundarios,
+        capitalSocial: c.capitalSocial,
+        optanteSimples: c.optanteSimples,
+        endereco: { logradouro: c.logradouro, numero: c.numero, complemento: c.complemento, bairro: c.bairro, municipio: c.municipio, uf: c.uf, cep: c.cep },
+        telefone: c.telefone,
+        email: c.email,
+        socios: c.socios,
+      }
+    : null;
+
+const viewDaConsulta = (d: DadosCnpj): ViewReceita => ({
+  razaoSocial: d.razaoSocial,
+  nomeFantasia: d.nomeFantasia,
+  situacao: d.situacao,
+  dataSituacao: d.dataSituacao,
+  dataAbertura: d.dataAbertura,
+  naturezaJuridica: d.naturezaJuridica,
+  porte: d.porte,
+  cnaePrincipal: d.cnaePrincipal,
+  cnaesSecundarios: d.cnaesSecundarios,
+  capitalSocial: d.capitalSocial,
+  optanteSimples: d.optanteSimples,
+  endereco: d.endereco,
+  telefone: d.telefone,
+  email: d.email,
+  socios: d.socios,
 });
 
 const Clientes = () => {
@@ -60,11 +106,50 @@ const Clientes = () => {
   const [editando, setEditando] = useState<ClienteDb | "novo" | null>(null);
   const [form, setForm] = useState<FormState>(vazio);
   const [salvando, setSalvando] = useState(false);
+  const [consulta, setConsulta] = useState<DadosCnpj | null>(null);
+  const [consultando, setConsultando] = useState(false);
+  const [erroCnpj, setErroCnpj] = useState<string | null>(null);
 
   useEffect(() => {
+    setConsulta(null);
+    setErroCnpj(null);
     if (editando === "novo") setForm(vazio);
     else if (editando) setForm(deCliente(editando));
   }, [editando]);
+
+  const buscarCnpj = async (valor: string) => {
+    if (!cnpjValido(valor)) {
+      setErroCnpj("CNPJ inválido. Confira os dígitos.");
+      return;
+    }
+    setConsultando(true);
+    setErroCnpj(null);
+    try {
+      const d = await consultarCnpj(soDigitos(valor));
+      setConsulta(d);
+      setForm((f) => ({
+        ...f,
+        cnpj: d.cnpj,
+        // Só sugere o que o usuário ainda não preencheu.
+        nome: f.nome.trim() ? f.nome : (d.nomeSugerido ?? d.razaoSocial ?? ""),
+        enderecoPostal: f.enderecoPostal.trim() ? f.enderecoPostal : enderecoLinha({ ...d.endereco, logradouro: limparLogradouro(d.endereco.logradouro) }),
+        telefone: f.telefone.trim() ? f.telefone : (d.telefone ?? ""),
+        email: f.email.trim() ? f.email : (d.email ?? ""),
+      }));
+    } catch (e) {
+      setErroCnpj((e as Error).message);
+    } finally {
+      setConsultando(false);
+    }
+  };
+
+  const mudarCnpj = (v: string) => {
+    const masc = mascararCnpj(v);
+    setForm((f) => ({ ...f, cnpj: masc }));
+    setErroCnpj(null);
+    // Ao completar os 14 dígitos, consulta sozinho.
+    if (soDigitos(masc).length === 14 && soDigitos(masc) !== soDigitos(consulta?.cnpj ?? "")) void buscarCnpj(masc);
+  };
 
   const numeros = useMemo(
     () =>
@@ -108,7 +193,33 @@ const Clientes = () => {
       texto_obrigatorio_nf: form.textoObrigatorioNf.trim() || null,
       contrato_info: linhas(form.contratos),
       observacoes_nf: linhas(form.regrasNf),
+      telefone: form.telefone.trim() || null,
+      email: form.email.trim() || null,
       ativo: form.ativo,
+      ...(consulta
+        ? {
+            razao_social: consulta.razaoSocial,
+            nome_fantasia: consulta.nomeFantasia,
+            situacao_cadastral: consulta.situacao,
+            data_situacao: consulta.dataSituacao,
+            data_abertura: consulta.dataAbertura,
+            natureza_juridica: consulta.naturezaJuridica,
+            porte: consulta.porte,
+            cnae_principal: consulta.cnaePrincipal,
+            cnaes_secundarios: consulta.cnaesSecundarios,
+            capital_social: consulta.capitalSocial,
+            optante_simples: consulta.optanteSimples,
+            logradouro: limparLogradouro(consulta.endereco.logradouro),
+            numero: consulta.endereco.numero,
+            complemento: consulta.endereco.complemento,
+            bairro: consulta.endereco.bairro,
+            municipio: consulta.endereco.municipio,
+            uf: consulta.endereco.uf,
+            cep: consulta.endereco.cep,
+            socios: consulta.socios as unknown as Json,
+            consultado_em: new Date().toISOString(),
+          }
+        : {}),
     };
     const { error } =
       editando === "novo"
@@ -118,7 +229,7 @@ const Clientes = () => {
     if (error) {
       toast({
         title: "Não foi possível salvar",
-        description: error.code === "23505" ? "Já existe um cliente com esse nome." : error.message,
+        description: error.code === "23505" ? (error.message.includes("cnpj") ? "Já existe um cliente com esse CNPJ." : "Já existe um cliente com esse nome.") : error.message,
         variant: "destructive",
       });
       return;
@@ -271,6 +382,13 @@ const Clientes = () => {
                 )}
               </section>
 
+              {viewDoCliente(resumo) && (
+                <section className="mt-8">
+                  <p className="eyebrow mb-2">Dados da Receita Federal</p>
+                  <DadosReceita d={viewDoCliente(resumo)!} consultadoEm={resumo.consultadoEm} />
+                </section>
+              )}
+
               <section className="mt-8 space-y-5">
                 <div>
                   <p className="eyebrow mb-2">Contrato e licitação</p>
@@ -324,15 +442,56 @@ const Clientes = () => {
 
           <div className="flex-1 space-y-4 py-5">
             <div className="space-y-1.5">
-              <Label htmlFor="c-nome">Nome</Label>
-              <Input id="c-nome" value={form.nome} onChange={(e) => set("nome", e.target.value)} placeholder="Prefeitura de Exemplo" />
-              {editando !== "novo" && (
-                <p className="text-xs text-muted-foreground">Ao renomear, as campanhas vinculadas acompanham. Envios antigos mantêm o nome da época.</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
               <Label htmlFor="c-cnpj">CNPJ</Label>
-              <Input id="c-cnpj" value={form.cnpj} onChange={(e) => set("cnpj", e.target.value)} placeholder="00.000.000/0000-00" />
+              <div className="flex gap-2">
+                <Input
+                  id="c-cnpj"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={form.cnpj}
+                  onChange={(e) => mudarCnpj(e.target.value)}
+                  placeholder="00.000.000/0000-00"
+                  aria-describedby="c-cnpj-ajuda"
+                  autoFocus={editando === "novo"}
+                />
+                <Button type="button" variant="outline" onClick={() => buscarCnpj(form.cnpj)} disabled={consultando || soDigitos(form.cnpj).length !== 14}>
+                  {consultando && <Loader2 className="animate-spin" />}
+                  {consulta || (editando && editando !== "novo" && editando.razaoSocial) ? "Atualizar" : "Buscar"}
+                </Button>
+              </div>
+              <p id="c-cnpj-ajuda" className={cn("text-xs", erroCnpj ? "text-destructive" : "text-muted-foreground")} aria-live="polite">
+                {erroCnpj ?? (consultando ? "Consultando a Receita Federal…" : consulta ? "Dados preenchidos pela Receita Federal (fonte: " + consulta.fonte + ")." : "Digite o CNPJ para trazer os dados da Receita Federal.")}
+              </p>
+            </div>
+
+            {(consulta || (editando && editando !== "novo" && viewDoCliente(editando))) && (
+              <section aria-label="Dados da Receita Federal">
+                <p className="eyebrow mb-2">Dados da Receita Federal</p>
+                <DadosReceita
+                  d={consulta ? viewDaConsulta(consulta) : viewDoCliente(editando as ClienteDb)!}
+                  fonte={consulta?.fonte}
+                  consultadoEm={consulta ? new Date().toISOString() : (editando as ClienteDb).consultadoEm}
+                />
+              </section>
+            )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="c-nome">Nome de exibição</Label>
+              <Input id="c-nome" value={form.nome} onChange={(e) => set("nome", e.target.value)} placeholder="Prefeitura de Exemplo" />
+              <p className="text-xs text-muted-foreground">
+                É o nome que o veículo vê no formulário.
+                {editando !== "novo" && " Ao renomear, as campanhas vinculadas acompanham; envios antigos mantêm o nome da época."}
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="c-tel">Telefone</Label>
+                <Input id="c-tel" value={form.telefone} onChange={(e) => set("telefone", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="c-email">E-mail</Label>
+                <Input id="c-email" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="c-contratos">Contrato e licitação</Label>
@@ -340,7 +499,7 @@ const Clientes = () => {
               <p className="text-xs text-muted-foreground">Um item por linha. A pré-análise confere se constam na nota.</p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="c-end">Endereço postal</Label>
+              <Label htmlFor="c-end">Endereço para correspondência</Label>
               <Textarea id="c-end" rows={2} value={form.enderecoPostal} onChange={(e) => set("enderecoPostal", e.target.value)} />
             </div>
             <div className="space-y-1.5">
