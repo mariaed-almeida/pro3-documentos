@@ -70,18 +70,36 @@ export function enderecoLinha(e: { logradouro?: string | null; numero?: string |
   return [rua, e.complemento, e.bairro, cidade, e.cep ? `CEP ${e.cep}` : null].filter(Boolean).join(" · ");
 }
 
-export async function consultarCnpj(cnpj: string): Promise<DadosCnpj> {
-  const { data, error } = await supabase.functions.invoke("consultar-cnpj", { body: { cnpj } });
-  if (error) {
-    let msg = "Não foi possível consultar o CNPJ agora.";
-    try {
-      const j = await (error as { context?: Response }).context?.json();
-      if (j?.error) msg = j.error;
-    } catch {
-      /* mantém a mensagem padrão */
-    }
-    throw new Error(msg);
+async function chamarConsulta(cnpj: string) {
+  return supabase.functions.invoke("consultar-cnpj", { body: { cnpj } });
+}
+
+/** Mensagem útil para cada falha: sessão vencida, falta de papel ou serviço da Receita fora do ar. */
+async function mensagemDeErro(error: unknown): Promise<{ status: number | null; msg: string }> {
+  const ctx = (error as { context?: Response }).context;
+  const status = ctx?.status ?? null;
+  let corpo: string | undefined;
+  try {
+    corpo = (await ctx?.json())?.error;
+  } catch {
+    /* sem corpo legível */
   }
+  if (status === 401) return { status, msg: "Sua sessão expirou. Saia e entre de novo no sistema." };
+  if (status === 403) return { status, msg: "Seu usuário não tem permissão para cadastrar. Peça a um administrador o papel de operador." };
+  return { status, msg: corpo ?? "Não foi possível consultar o CNPJ agora." };
+}
+
+export async function consultarCnpj(cnpj: string): Promise<DadosCnpj> {
+  let { data, error } = await chamarConsulta(cnpj);
+  if (error) {
+    const { status } = await mensagemDeErro(error);
+    if (status === 401) {
+      // O token pode ter vencido com a aba aberta: renova a sessão e tenta uma vez mais.
+      const { error: erroSessao } = await supabase.auth.refreshSession();
+      if (!erroSessao) ({ data, error } = await chamarConsulta(cnpj));
+    }
+  }
+  if (error) throw new Error((await mensagemDeErro(error)).msg);
   if (data?.error) throw new Error(data.error);
   return data as DadosCnpj;
 }
