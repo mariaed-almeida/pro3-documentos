@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
 
     const { data: s } = await supabase
       .from("submissions")
-      .select("id, numero_pi, cliente, campanha, nome_veiculo, cidade, contato_nome, contato_email, contato_telefone, data_envio")
+      .select("id, numero_pi, cliente, campanha, nome_veiculo, cidade, contato_nome, contato_email, contato_telefone, tipo_veiculo, outro_tipo, observacoes, data_envio")
       .eq("id", b.submissionId)
       .single();
     if (!s) return json({ error: "Envio não encontrado" }, 404);
@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
       cidade: s.cidade,
     };
 
-    const qs = new URLSearchParams({ cliente: s.cliente, pi: s.numero_pi, nome: s.contato_nome ?? "", email: s.contato_email ?? "", fone: s.contato_telefone ?? "" });
+    const qs = new URLSearchParams({ cliente: s.cliente, pi: s.numero_pi, nome: s.contato_nome ?? "", email: s.contato_email ?? "", fone: s.contato_telefone ?? "", campanha: s.campanha ?? "", tipo: s.tipo_veiculo ?? "", outro: s.outro_tipo ?? "", veiculo: s.nome_veiculo ?? "", cidade: s.cidade ?? "", obs: s.observacoes ?? "" });
     for (const [k, v] of [...qs]) if (!v) qs.delete(k);
     const linkReenvio = `${REENVIO_URL}?${qs}`;
 
@@ -164,6 +164,9 @@ Deno.serve(async (req) => {
       );
       text = `[${aviso}]\n\n${text}`;
     }
+
+    // O HTML segue só com ASCII (acentos viram entidades), para não depender da codificação do leitor de e-mail.
+    html = html.replace(/[^\u0000-\u007F]/gu, (c) => `&#${c.codePointAt(0)};`);
 
     const resposta = await fetch("https://api.resend.com/emails", {
       method: "POST",

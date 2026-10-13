@@ -125,6 +125,13 @@ const VeiculoForm = () => {
     if (q.get("nome")) setContatoNome(q.get("nome")!);
     if (q.get("email")) setContatoEmail(q.get("email")!);
     if (q.get("fone")) setContatoTelefone(q.get("fone")!);
+    if (q.get("campanha")) setCampanha(q.get("campanha")!);
+    const tipo = q.get("tipo");
+    if (tipo && (TIPOS_VEICULO as string[]).includes(tipo)) setTipoVeiculo(tipo as TipoVeiculo);
+    if (q.get("outro")) setOutroTipo(q.get("outro")!);
+    if (q.get("veiculo")) setNomeVeiculo(q.get("veiculo")!);
+    if (q.get("cidade")) setCidade(q.get("cidade")!);
+    if (q.get("obs")) setObservacoes(q.get("obs")!);
   }, []);
 
   // PI já emitido pela agência: preenche campanha, veículo, tipo e cidade a partir do número.
