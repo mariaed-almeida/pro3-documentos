@@ -30,6 +30,9 @@ import {
   type BasePrazo, type PiItem,
 } from "@/lib/pedidos";
 import { baixarPiPdf, gerarPiPdf } from "@/lib/pi-pdf";
+import { supabase } from "@/integrations/supabase/client";
+import { STATUS_MEDICAO, type StatusMedicao } from "@/lib/medicoes";
+import { statusOf } from "@/lib/status";
 import { formatBRL, parseBRL } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
@@ -63,6 +66,19 @@ const PedidoEditor = () => {
   const [previa, setPrevia] = useState<string | null>(null);
   const [confirmar, setConfirmar] = useState<"emitir" | "cancelar" | "excluir" | null>(null);
   const [tocado, setTocado] = useState(false);
+
+  // O que já aconteceu com este PI depois de emitido: envio de documentos e medição.
+  const { data: andamento } = useQuery({
+    queryKey: ["pedido-andamento", id],
+    enabled: !!id,
+    queryFn: async () => {
+      const [{ data: envios }, { data: meds }] = await Promise.all([
+        supabase.from("submissions").select("id, status, data_envio").eq("pedido_id", id!).order("data_envio", { ascending: false }),
+        supabase.from("medicoes").select("id, status, valor_liquido").eq("pedido_id", id!),
+      ]);
+      return { envios: envios ?? [], medicao: meds?.[0] ?? null };
+    },
+  });
 
   useEffect(() => {
     let vivo = true;
@@ -508,6 +524,38 @@ const PedidoEditor = () => {
               <div className="flex justify-between py-2"><dt className="text-muted-foreground">Vencimento</dt><dd className="num">{formatVencimento(pedido.dataEmissao, pedido.prazoDias, pedido.prazoBase)}</dd></div>
             </dl>
           </Panel>
+
+          {!novo && pedido.status === "emitido" && (
+            <Panel title="Andamento">
+              <dl className="divide-y text-sm">
+                <div className="flex items-start justify-between gap-3 py-2">
+                  <dt className="text-muted-foreground">Documentos</dt>
+                  <dd className="text-right">
+                    {andamento?.envios.length ? (
+                      <Link to={`/app/documentos/${andamento.envios[0].id}`} className="hover:text-primary">
+                        {statusOf(andamento.envios[0].status).label}
+                        {andamento.envios.length > 1 && ` · ${andamento.envios.length} envios`}
+                      </Link>
+                    ) : (
+                      <span className="text-muted-foreground">Aguardando o veículo</span>
+                    )}
+                  </dd>
+                </div>
+                <div className="flex items-start justify-between gap-3 py-2">
+                  <dt className="text-muted-foreground">Medição</dt>
+                  <dd className="text-right">
+                    {andamento?.medicao ? (
+                      <Link to="/app/faturamento" className="hover:text-primary">
+                        {STATUS_MEDICAO[andamento.medicao.status as StatusMedicao].label}
+                      </Link>
+                    ) : (
+                      <span className="text-muted-foreground">Nasce quando os documentos forem aprovados</span>
+                    )}
+                  </dd>
+                </div>
+              </dl>
+            </Panel>
+          )}
 
           {canOperate && pedido.status !== "cancelado" && (
             <div className="space-y-2">

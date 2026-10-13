@@ -19,6 +19,8 @@ export interface Medicao {
   previsaoPagamento: string | null;
   pagoEm: string | null;
   createdAt: string;
+  pedidoId: string | null;
+  vencimento: string | null;
   cliente: string;
   campanha: string;
   numeroPi: string;
@@ -72,7 +74,7 @@ export interface MedicaoEvento {
 }
 
 const SELECT =
-  "id, submission_id, valor_bruto, comissao_agencia, valor_liquido, periodo_inicio, periodo_fim, numero_nf, observacoes, status, enviado_em, liberado_em, previsao_pagamento, pago_em, created_at, submissions(cliente, campanha, numero_pi, nome_veiculo, cidade)";
+  "id, submission_id, valor_bruto, comissao_agencia, valor_liquido, periodo_inicio, periodo_fim, numero_nf, observacoes, status, enviado_em, liberado_em, previsao_pagamento, pago_em, created_at, pedido_id, vencimento, submissions(cliente, campanha, numero_pi, nome_veiculo, cidade)";
 
 export async function listMedicoes(): Promise<Medicao[]> {
   const { data, error } = await supabase.from("medicoes").select(SELECT).order("created_at", { ascending: false });
@@ -93,6 +95,8 @@ export async function listMedicoes(): Promise<Medicao[]> {
     previsaoPagamento: m.previsao_pagamento,
     pagoEm: m.pago_em,
     createdAt: m.created_at,
+    pedidoId: m.pedido_id,
+    vencimento: m.vencimento,
     cliente: m.submissions?.cliente ?? "",
     campanha: m.submissions?.campanha ?? "",
     numeroPi: m.submissions?.numero_pi ?? "",

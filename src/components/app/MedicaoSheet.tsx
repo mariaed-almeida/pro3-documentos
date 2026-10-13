@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import MedicaoDialog from "@/components/app/MedicaoDialog";
+import EspelhoPi from "@/components/app/EspelhoPi";
 import { useMedicaoEventos } from "@/hooks/use-medicoes";
 import { useRoles } from "@/hooks/use-roles";
 import { useToast } from "@/hooks/use-toast";
@@ -47,8 +48,9 @@ const MedicaoSheet = ({ medicao, onClose, onChanged }: Props) => {
   useEffect(() => {
     setAcao(null);
     setMotivo("");
-    setData(hoje());
-  }, [medicao?.id]);
+    // A previsão de pagamento já sugere o vencimento do PI, quando ele ainda não passou.
+    setData(medicao?.vencimento && medicao.vencimento >= hoje() ? medicao.vencimento : hoje());
+  }, [medicao?.id, medicao?.vencimento]);
 
   if (!medicao) return null;
   const m = medicao;
@@ -108,6 +110,7 @@ const MedicaoSheet = ({ medicao, onClose, onChanged }: Props) => {
               </Linha>
             )}
             {m.numeroNf && <Linha label="Nota fiscal">{m.numeroNf}</Linha>}
+            {m.vencimento && <Linha label="Vencimento do PI">{formatDate(m.vencimento)}</Linha>}
             {m.previsaoPagamento && <Linha label="Previsão de pagamento">{formatDate(m.previsaoPagamento)}</Linha>}
             {m.pagoEm && <Linha label="Pago em">{formatDate(m.pagoEm)}</Linha>}
           </dl>
@@ -152,6 +155,13 @@ const MedicaoSheet = ({ medicao, onClose, onChanged }: Props) => {
               <Link to={`/app/documentos/${m.submissionId}`}>Abrir documentos do PI</Link>
             </Button>
           </div>
+
+          {m.pedidoId && (
+            <div className="mt-8">
+              <p className="eyebrow mb-3">Espelho do PI</p>
+              <EspelhoPi pedidoId={m.pedidoId} valorMedido={{ bruto: m.valorBruto, comissao: m.comissao }} />
+            </div>
+          )}
 
           <div className="mt-8">
             <p className="eyebrow mb-3">Histórico</p>

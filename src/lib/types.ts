@@ -47,6 +47,8 @@ export interface Submission {
   dataEnvio: string;
   observacoes?: string;
   analiseIa?: AnaliseIa;
+  /** PI emitido pelo sistema com o mesmo cliente e número. */
+  pedidoId?: string;
 }
 
 export const DOC_TYPE_LABELS: Record<string, string> = {

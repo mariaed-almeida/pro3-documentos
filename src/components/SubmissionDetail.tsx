@@ -63,7 +63,18 @@ const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
         body: { submissionId: submission.id },
       });
       if (error || !data?.success) {
-        throw new Error(data?.error || error?.message || "Falha ao analisar documentação");
+        // O corpo da resposta de erro da função traz o motivo real.
+        let motivo: string | undefined = data?.error;
+        const ctx = (error as { context?: Response } | null)?.context;
+        if (!motivo && ctx) {
+          try {
+            motivo = (await ctx.json())?.error;
+          } catch {
+            /* sem corpo legível */
+          }
+          if (ctx.status === 401) motivo = "Sua sessão expirou. Saia e entre de novo no sistema.";
+        }
+        throw new Error(motivo || error?.message || "Falha ao analisar documentação");
       }
       setAnaliseIa(data.analise);
       toast({ title: "Análise concluída", description: "Revise as sugestões da IA abaixo." });
@@ -378,6 +389,18 @@ const SubmissionDetail = ({ submission, onStatusUpdate }: Props) => {
             </fieldset>
             {!canOperate && <p className="mt-3 text-xs text-muted-foreground">Só operadores e administradores decidem sobre a documentação.</p>}
           </Panel>
+
+          {submission.pedidoId && (
+            <Panel title="Pedido de inserção">
+              <p className="text-sm">
+                Ligado ao PI do sistema.{" "}
+                <Link to={`/app/pedidos/${submission.pedidoId}`} className="font-medium text-primary hover:underline">
+                  Abrir PI
+                </Link>
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">Ao aprovar, a medição é criada com os valores do PI.</p>
+            </Panel>
+          )}
 
           <Panel title="Veículo e contato">
             <dl className="space-y-3 text-sm">

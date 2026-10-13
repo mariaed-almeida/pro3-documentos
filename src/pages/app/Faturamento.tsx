@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Receipt } from "lucide-react";
 import PageHeader from "@/components/app/PageHeader";
 import EmptyState from "@/components/app/EmptyState";
@@ -10,7 +10,9 @@ import { Button } from "@/components/ui/button";
 import { useMedicoes, MEDICOES_KEY } from "@/hooks/use-medicoes";
 import { useSubmissions } from "@/hooks/use-submissions";
 import { useRoles } from "@/hooks/use-roles";
-import { STATUS_MEDICAO, type Medicao, type StatusMedicao } from "@/lib/medicoes";
+import { useToast } from "@/hooks/use-toast";
+import { listPedidos } from "@/lib/pedidos-db";
+import { criarMedicao, STATUS_MEDICAO, type Medicao, type StatusMedicao } from "@/lib/medicoes";
 import { formatBRL } from "@/lib/money";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -35,6 +37,10 @@ const Faturamento = () => {
   const { data: medicoes = [], isLoading } = useMedicoes();
   const { data: submissions = [] } = useSubmissions();
   const { canOperate } = useRoles();
+  const { toast } = useToast();
+  const { data: pedidos = [] } = useQuery({ queryKey: ["pedidos"], queryFn: listPedidos });
+  const pedidoPorId = useMemo(() => new Map(pedidos.map((p) => [p.id, p])), [pedidos]);
+  const [gerando, setGerando] = useState<string | null>(null);
 
   const [aba, setAba] = useState<Aba>("a_medir");
   const [medindo, setMedindo] = useState<Submission | null>(null);
@@ -53,6 +59,29 @@ const Faturamento = () => {
   const lista = aba === "a_medir" ? [] : por(aba);
   const refresh = () => qc.invalidateQueries({ queryKey: MEDICOES_KEY });
 
+  const gerarDoPi = async (s: Submission) => {
+    const pi = s.pedidoId ? pedidoPorId.get(s.pedidoId) : undefined;
+    if (!pi) return;
+    setGerando(s.id);
+    try {
+      const mm = String(pi.mes).padStart(2, "0");
+      const ultimo = new Date(pi.ano, pi.mes, 0).getDate();
+      await criarMedicao(s.id, {
+        valorBruto: pi.valorBruto,
+        comissao: pi.comissao,
+        periodoInicio: `${pi.ano}-${mm}-01`,
+        periodoFim: `${pi.ano}-${mm}-${String(ultimo).padStart(2, "0")}`,
+      });
+      toast({ title: "Medição criada a partir do PI " + pi.numero });
+      refresh();
+      setAba("em_medicao");
+    } catch (e) {
+      toast({ title: "Não foi possível gerar a medição", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setGerando(null);
+    }
+  };
+
   const resumo = [
     { label: "A medir", valor: `${aMedir.length} ${aMedir.length === 1 ? "PI" : "PIs"}`, nota: "Aprovados sem valor" },
     { label: "Em medição", valor: formatBRL(soma(por("em_medicao"), "valorLiquido")), nota: `${por("em_medicao").length} medições` },
@@ -68,6 +97,7 @@ const Faturamento = () => {
   const dataRelevante = (m: Medicao) => {
     if (m.status === "pago") return m.pagoEm ? `Pago em ${formatDate(m.pagoEm)}` : "—";
     if (m.status === "liberado") return m.previsaoPagamento ? `Previsto ${formatDate(m.previsaoPagamento)}` : "Sem previsão";
+    if (m.vencimento) return `Vence ${formatDate(m.vencimento)}`;
     if (m.status === "aguardando_liberacao") return m.enviadoEm ? `Enviado ${formatDate(m.enviadoEm)}` : "—";
     return `Criado ${formatDate(m.createdAt)}`;
   };
@@ -77,7 +107,7 @@ const Faturamento = () => {
       <PageHeader
         eyebrow="Financeiro"
         title="Faturamento"
-        description="Cada PI aprovado ganha uma medição com valores. O operador fecha a medição, o financeiro libera e registra o pagamento ao veículo."
+        description="A medição nasce do PI emitido quando os documentos são aprovados, com os mesmos valores e o mesmo vencimento. O financeiro libera e registra o pagamento ao veículo."
         actions={
           <Button asChild variant="outline">
             <Link to="/app/gerencial">Ver visão gerencial</Link>
@@ -139,12 +169,24 @@ const Faturamento = () => {
                     {s.cliente} · {s.campanha}
                   </p>
                 </div>
-                <span className="num hidden text-xs text-muted-foreground sm:block">Enviado {formatDate(s.dataEnvio)}</span>
-                {canOperate && (
-                  <Button size="sm" onClick={() => setMedindo(s)}>
-                    Medir
-                  </Button>
+                {s.pedidoId && pedidoPorId.get(s.pedidoId) ? (
+                  <span className="num hidden text-right text-xs sm:block">
+                    <span className="block font-medium">{formatBRL(pedidoPorId.get(s.pedidoId)!.valorLiquido)}</span>
+                    <span className="text-muted-foreground">líquido do PI {pedidoPorId.get(s.pedidoId)!.numero}</span>
+                  </span>
+                ) : (
+                  <span className="num hidden text-xs text-muted-foreground sm:block">Sem PI no sistema · enviado {formatDate(s.dataEnvio)}</span>
                 )}
+                {canOperate &&
+                  (s.pedidoId && pedidoPorId.get(s.pedidoId) ? (
+                    <Button size="sm" onClick={() => gerarDoPi(s)} disabled={gerando === s.id}>
+                      {gerando === s.id && <Loader2 className="animate-spin" />} Gerar medição
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => setMedindo(s)}>
+                      Medir
+                    </Button>
+                  ))}
               </li>
             ))}
           </ul>

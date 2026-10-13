@@ -151,36 +151,51 @@ Responda SOMENTE com JSON, sem texto antes ou depois, neste formato:
     }
     conteudo.push({ type: "text", text: instrucoes });
 
-    const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODELO,
-        max_tokens: 2000,
-        messages: [{ role: "user", content: conteudo }],
-      }),
-    });
+    // O modelo às vezes devolve texto em volta do JSON ou corta a resposta; tenta duas vezes
+    // e extrai o objeto JSON mesmo que venha com texto antes ou depois.
+    let achados: { achados: unknown[] } | null = null;
+    let falhaIa = false;
+    for (let tentativa = 1; tentativa <= 2 && !achados; tentativa++) {
+      const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: MODELO,
+          max_tokens: 4000,
+          messages: [{ role: "user", content: conteudo }],
+        }),
+      });
 
-    if (!aiResponse.ok) {
-      const detalhe = await aiResponse.text();
-      console.error("Erro na API da Anthropic:", aiResponse.status, detalhe);
-      return json({ error: "Falha ao chamar a IA" }, 502);
+      if (!aiResponse.ok) {
+        const detalhe = await aiResponse.text();
+        console.error("Erro na API da Anthropic:", aiResponse.status, detalhe);
+        falhaIa = true;
+        continue;
+      }
+      falhaIa = false;
+
+      const aiData = await aiResponse.json();
+      const texto: string = aiData.content?.find((b: any) => b.type === "text")?.text ?? "";
+      const bruto = texto.replace(/```json\s*|```\s*/g, "");
+      const trecho = bruto.slice(bruto.indexOf("{"), bruto.lastIndexOf("}") + 1);
+      try {
+        const lido = JSON.parse(trecho);
+        if (Array.isArray(lido.achados)) achados = lido;
+        else throw new Error("formato");
+      } catch {
+        console.error(`Resposta da IA fora do formato (tentativa ${tentativa}, parada: ${aiData.stop_reason}):`, texto.slice(0, 400));
+      }
     }
 
-    const aiData = await aiResponse.json();
-    const texto: string = aiData.content?.find((b: any) => b.type === "text")?.text ?? "";
-
-    let achados: { achados: unknown[] };
-    try {
-      achados = JSON.parse(texto.replace(/```json\s*|```\s*/g, "").trim());
-      if (!Array.isArray(achados.achados)) throw new Error("formato");
-    } catch {
-      console.error("Resposta da IA fora do formato:", texto.slice(0, 500));
-      return json({ error: "A IA retornou um formato inesperado. Tente novamente." }, 502);
+    if (!achados) {
+      return json(
+        { error: falhaIa ? "Falha ao chamar a IA" : "A IA retornou um formato inesperado. Tente novamente." },
+        502,
+      );
     }
 
     const analise = { geradoEm: new Date().toISOString(), achados: achados.achados };

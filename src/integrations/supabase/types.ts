@@ -388,6 +388,8 @@ export type Database = {
           updated_at: string;
           valor_bruto: number;
           valor_liquido: number;
+          pedido_id: string | null;
+          vencimento: string | null;
         };
         Insert: {
           comissao_agencia?: number;
@@ -397,6 +399,8 @@ export type Database = {
           periodo_inicio?: string | null;
           submission_id: string;
           valor_bruto: number;
+          pedido_id?: string | null;
+          vencimento?: string | null;
         };
         Update: {
           comissao_agencia?: number;
@@ -405,6 +409,7 @@ export type Database = {
           periodo_fim?: string | null;
           periodo_inicio?: string | null;
           valor_bruto?: number;
+          vencimento?: string | null;
         };
         Relationships: [Rel<{ referencedRelation: "submissions" }>];
       };
