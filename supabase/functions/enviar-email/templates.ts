@@ -102,6 +102,9 @@ function moldura(titulo: string, corpo: string, a: Agencia | null, logoUrl: stri
 
 const p = (t: string, extra = "") => `<p style="margin: 0 0 16px;${extra}">${t}</p>`;
 
+const botao = (url: string, rotulo: string) =>
+  `<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 4px 0 20px;"><tr><td style="background: ${AZUL}; border-radius: 4px;"><a href="${esc(url)}" style="display: inline-block; padding: 12px 22px; font-family: Arial, Helvetica, sans-serif; font-size: 15px; font-weight: bold; color: #ffffff; text-decoration: none;">${esc(rotulo)}</a></td></tr></table>`;
+
 const resumoPi = (d: DadosEnvio) => {
   const linha = (k: string, v: string) =>
     `<tr><td style="padding: 3px 14px 3px 0; color: ${MUDO}; white-space: nowrap; vertical-align: top;">${esc(k)}</td><td style="padding: 3px 0;">${esc(normalizar(v))}</td></tr>`;
@@ -163,7 +166,7 @@ export function montarProtocolo(d: DadosEnvio, protocolo: string, recebidoEm: st
   };
 }
 
-export function montarDevolucao(d: DadosEnvio, motivo: string, a: Agencia | null, logoUrl: string): Montado {
+export function montarDevolucao(d: DadosEnvio, motivo: string, a: Agencia | null, logoUrl: string, reenvioUrl?: string): Montado {
   const nome = primeiroNome(d.contatoNome);
   const pontos = normalizar(motivo)
     .split(/\r?\n/)
@@ -180,6 +183,7 @@ export function montarDevolucao(d: DadosEnvio, motivo: string, a: Agencia | null
     lista,
     resumoPi(d),
     p(`Para reenviar, abra o formulário de envio, escolha o cliente ${esc(normalizar(d.cliente))} e informe o mesmo número de PI (${esc(d.numeroPi)}). Os arquivos novos são juntados ao envio anterior.`),
+    reenvioUrl ? botao(reenvioUrl, "Clique aqui para reenviar") : "",
     p("Qualquer dúvida, é só responder esta mensagem."),
     assinatura(a),
   ].join("\n");
@@ -196,6 +200,7 @@ export function montarDevolucao(d: DadosEnvio, motivo: string, a: Agencia | null
     `Veículo: ${d.veiculo}`,
     "",
     `Para reenviar, abra o formulário de envio, escolha o cliente ${d.cliente} e informe o mesmo número de PI (${d.numeroPi}). Os arquivos novos são juntados ao envio anterior.`,
+    ...(reenvioUrl ? [`Reenviar: ${reenvioUrl}`] : []),
     "Qualquer dúvida, é só responder esta mensagem.",
     "",
     "Atenciosamente,",

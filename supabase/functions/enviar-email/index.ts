@@ -28,6 +28,8 @@ const json = (body: unknown, status = 200) =>
 
 const LOGO_URL = Deno.env.get("EMAIL_LOGO_URL") ?? "https://pro3-documentos.vercel.app/email/logo-pro3.png";
 
+const REENVIO_URL = Deno.env.get("EMAIL_REENVIO_URL") ?? "https://pro3-documentos.vercel.app/veiculo";
+
 const Body = z.discriminatedUnion("tipo", [
   z.object({ tipo: z.literal("protocolo"), submissionId: z.string().uuid() }),
   z.object({ tipo: z.literal("devolucao"), submissionId: z.string().uuid(), motivo: z.string().trim().min(1).max(4000) }),
@@ -124,7 +126,7 @@ Deno.serve(async (req) => {
       const quando = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" }).format(new Date(s.data_envio));
       ({ assunto, html, text } = montarProtocolo(dados, protocoloDe(s.id, s.data_envio), quando.replace(",", " as"), itens, agencia, LOGO_URL));
     } else {
-      ({ assunto, html, text } = montarDevolucao(dados, b.motivo, agencia, LOGO_URL));
+      ({ assunto, html, text } = montarDevolucao(dados, b.motivo, agencia, LOGO_URL, REENVIO_URL));
     }
 
     const registrar = (status: "enviado" | "falhou" | "nao_configurado", erro?: string, providerId?: string) =>
