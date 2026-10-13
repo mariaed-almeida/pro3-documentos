@@ -9,7 +9,8 @@
 // 2) Botão "Analisar" do painel, autenticado pelo JWT de um usuário com papel de equipe.
 //    Corpo: { submissionId }.
 //
-// Segredos: ANTHROPIC_API_KEY. Opcional: ANALISE_MODEL. O segredo do webhook fica no Vault do banco.
+// Chave da Anthropic: secret ANTHROPIC_API_KEY da função ou, na falta dele, o segredo "anthropic_api_key" do
+// Vault. Opcional: ANALISE_MODEL (padrão: claude-haiku-5-5). O segredo do webhook também fica no Vault.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -21,7 +22,8 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-const MODELO = Deno.env.get("ANALISE_MODEL") ?? "claude-sonnet-5-5";
+// Modelo barato e rápido: a análise é uma conferência objetiva de poucos pontos.
+const MODELO = Deno.env.get("ANALISE_MODEL") ?? "claude-haiku-5-5";
 const EXT_SUPORTADAS = /\.(pdf|jpe?g|png)$/i;
 
 
@@ -31,7 +33,7 @@ Deno.serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+  let ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
@@ -64,7 +66,11 @@ Deno.serve(async (req) => {
     }
     if (!submissionId) return json({ error: "submissionId é obrigatório" }, 400);
 
-    if (!ANTHROPIC_API_KEY) return json({ error: "ANTHROPIC_API_KEY não configurada" }, 500);
+    if (!ANTHROPIC_API_KEY) {
+      const { data: chave } = await supabase.rpc("obter_segredo", { p_nome: "anthropic_api_key" });
+      ANTHROPIC_API_KEY = (chave as string | null) ?? undefined;
+    }
+    if (!ANTHROPIC_API_KEY) return json({ error: "Chave da API Anthropic não configurada" }, 500);
 
     const { data: submission } = await supabase.from("submissions").select("*").eq("id", submissionId).single();
     if (!submission) return json({ error: "Envio não encontrado" }, 404);

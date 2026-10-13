@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  BarChart3, Building2, ClipboardCheck, ExternalLink, FileStack, LayoutDashboard, Landmark, Receipt, UserCog,
+  BarChart3, Building2, ClipboardCheck, ExternalLink, FileStack, LayoutDashboard, Landmark, Receipt, UserCog, FilePlus2, Briefcase,
   Loader2, LogOut, Megaphone, Menu, Radio,
 } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -33,6 +33,7 @@ const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => {
 
   const principal: NavItem[] = [
     { to: "/app", label: "Visão geral", icon: LayoutDashboard, end: true },
+    { to: "/app/pedidos", label: "Pedidos de inserção", icon: FilePlus2 },
     { to: "/app/documentos", label: "Documentos", icon: FileStack },
     { to: "/app/aprovacoes", label: "Aprovações", icon: ClipboardCheck, badge: pendentes },
     { to: "/app/faturamento", label: "Faturamento", icon: Receipt, badge: faturamentoPendente },
@@ -43,6 +44,7 @@ const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => {
     { to: "/app/cadastros/clientes", label: "Clientes", icon: Building2 },
     { to: "/app/cadastros/campanhas", label: "Campanhas", icon: Megaphone },
     { to: "/app/cadastros/veiculos", label: "Veículos", icon: Radio },
+    { to: "/app/cadastros/agencia", label: "Agência", icon: Briefcase },
     ...(isAdmin ? [{ to: "/app/cadastros/usuarios", label: "Usuários", icon: UserCog }] : []),
   ];
 

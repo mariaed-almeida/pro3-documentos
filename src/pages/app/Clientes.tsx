@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, Loader2, Plus, Search } from "lucide-react";
 import DadosReceita, { type ViewReceita } from "@/components/app/DadosReceita";
+import { receitaPayload } from "@/lib/receita";
 import { consultarCnpj, cnpjValido, enderecoLinha, limparLogradouro, mascararCnpj, soDigitos, type DadosCnpj } from "@/lib/cnpj";
 import PageHeader from "@/components/app/PageHeader";
 import EmptyState from "@/components/app/EmptyState";
@@ -12,6 +13,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useSubmissions } from "@/hooks/use-submissions";
 import { CLIENTES_KEY, useClientes, type ClienteDb } from "@/hooks/use-clientes";
 import { useMedicoes } from "@/hooks/use-medicoes";
@@ -35,10 +40,11 @@ interface FormState {
   regrasNf: string;
   telefone: string;
   email: string;
+  orientacoesPi: string;
   ativo: boolean;
 }
 
-const vazio: FormState = { nome: "", cnpj: "", enderecoPostal: "", textoObrigatorioNf: "", contratos: "", regrasNf: "", telefone: "", email: "", ativo: true };
+const vazio: FormState = { nome: "", cnpj: "", enderecoPostal: "", textoObrigatorioNf: "", contratos: "", regrasNf: "", telefone: "", email: "", orientacoesPi: "", ativo: true };
 
 const deCliente = (c: ClienteDb): FormState => ({
   nome: c.nome,
@@ -49,6 +55,7 @@ const deCliente = (c: ClienteDb): FormState => ({
   regrasNf: c.observacoesNf.join("\n"),
   telefone: c.telefone ?? "",
   email: c.email ?? "",
+  orientacoesPi: c.orientacoesPi ?? "",
   ativo: c.ativo,
 });
 
@@ -109,6 +116,8 @@ const Clientes = () => {
   const [consulta, setConsulta] = useState<DadosCnpj | null>(null);
   const [consultando, setConsultando] = useState(false);
   const [erroCnpj, setErroCnpj] = useState<string | null>(null);
+  const [excluindo, setExcluindo] = useState<ClienteDb | null>(null);
+  const [pedidosDoCliente, setPedidosDoCliente] = useState(0);
 
   useEffect(() => {
     setConsulta(null);
@@ -184,6 +193,39 @@ const Clientes = () => {
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
 
+  const pedirExclusao = async (c: ClienteDb) => {
+    const { count } = await supabase.from("pedidos_insercao").select("id", { count: "exact", head: true }).eq("cliente_id", c.id);
+    setPedidosDoCliente(count ?? 0);
+    setExcluindo(c);
+  };
+
+  const enviosDoExcluindo = excluindo ? (numeros.get(excluindo.nome)?.envios ?? 0) : 0;
+  const bloqueado = enviosDoExcluindo > 0 || pedidosDoCliente > 0;
+
+  const excluir = async () => {
+    if (!excluindo) return;
+    // Campanhas (e as regras de documentos delas) saem junto; o banco recusa se houver PI.
+    const { error: eCamp } = await supabase.from("campanhas").delete().eq("cliente", excluindo.nome);
+    const { error } = eCamp ? { error: eCamp } : await supabase.from("clientes").delete().eq("id", excluindo.id);
+    if (error) {
+      toast({ title: "Não foi possível excluir", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Cliente excluído" });
+    setExcluindo(null);
+    setResumoDe(null);
+    qc.invalidateQueries({ queryKey: CLIENTES_KEY });
+    qc.invalidateQueries({ queryKey: ["campanhas"] });
+  };
+
+  const desativar = async () => {
+    if (!excluindo) return;
+    await supabase.from("clientes").update({ ativo: false }).eq("id", excluindo.id);
+    toast({ title: "Cliente desativado" });
+    setExcluindo(null);
+    qc.invalidateQueries({ queryKey: CLIENTES_KEY });
+  };
+
   const salvar = async () => {
     setSalvando(true);
     const payload = {
@@ -195,31 +237,9 @@ const Clientes = () => {
       observacoes_nf: linhas(form.regrasNf),
       telefone: form.telefone.trim() || null,
       email: form.email.trim() || null,
+      orientacoes_pi: form.orientacoesPi.trim() || null,
       ativo: form.ativo,
-      ...(consulta
-        ? {
-            razao_social: consulta.razaoSocial,
-            nome_fantasia: consulta.nomeFantasia,
-            situacao_cadastral: consulta.situacao,
-            data_situacao: consulta.dataSituacao,
-            data_abertura: consulta.dataAbertura,
-            natureza_juridica: consulta.naturezaJuridica,
-            porte: consulta.porte,
-            cnae_principal: consulta.cnaePrincipal,
-            cnaes_secundarios: consulta.cnaesSecundarios,
-            capital_social: consulta.capitalSocial,
-            optante_simples: consulta.optanteSimples,
-            logradouro: limparLogradouro(consulta.endereco.logradouro),
-            numero: consulta.endereco.numero,
-            complemento: consulta.endereco.complemento,
-            bairro: consulta.endereco.bairro,
-            municipio: consulta.endereco.municipio,
-            uf: consulta.endereco.uf,
-            cep: consulta.endereco.cep,
-            socios: consulta.socios as unknown as Json,
-            consultado_em: new Date().toISOString(),
-          }
-        : {}),
+      ...(consulta ? receitaPayload(consulta) : {}),
     };
     const { error } =
       editando === "novo"
@@ -421,9 +441,12 @@ const Clientes = () => {
               </section>
 
               {isAdmin && (
-                <div className="mt-8 border-t pt-5">
+                <div className="mt-8 flex items-center justify-between gap-3 border-t pt-5">
                   <Button variant="outline" onClick={() => { setResumoDe(null); setEditando(resumo); }}>
                     Editar cadastro
+                  </Button>
+                  <Button variant="ghost" className="text-muted-foreground hover:text-destructive" onClick={() => pedirExclusao(resumo)}>
+                    Excluir cliente
                   </Button>
                 </div>
               )}
@@ -512,6 +535,13 @@ const Clientes = () => {
               <Textarea id="c-regras" rows={6} value={form.regrasNf} onChange={(e) => set("regrasNf", e.target.value)} />
               <p className="text-xs text-muted-foreground">Uma regra por linha.</p>
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="c-orient">Orientações impressas no PI</Label>
+              <Textarea id="c-orient" rows={5} value={form.orientacoesPi} onChange={(e) => set("orientacoesPi", e.target.value)} />
+              <p className="text-xs text-muted-foreground">
+                Opcional. Vazio usa o texto padrão, montado com os contratos e o texto obrigatório acima, mais as orientações da agência.
+              </p>
+            </div>
             <label className="flex items-center justify-between gap-4 rounded-md border px-3 py-2.5 text-sm">
               <span>
                 Cliente ativo
@@ -529,6 +559,27 @@ const Clientes = () => {
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      <AlertDialog open={!!excluindo} onOpenChange={(o) => !o && setExcluindo(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir {excluindo?.nome}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {bloqueado
+                ? "Este cliente tem " + [enviosDoExcluindo > 0 && enviosDoExcluindo + (enviosDoExcluindo === 1 ? " envio de documentos" : " envios de documentos"), pedidosDoCliente > 0 && pedidosDoCliente + (pedidosDoCliente === 1 ? " Pedido de Inserção" : " Pedidos de Inserção")].filter(Boolean).join(" e ") + " e não pode ser excluído. Desative o cadastro: ele sai do formulário e das listas, e o histórico fica preservado."
+                : "O cadastro e as campanhas dele são removidos de vez. Essa ação não pode ser desfeita."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            {bloqueado ? (
+              <AlertDialogAction onClick={desativar}>Desativar</AlertDialogAction>
+            ) : (
+              <AlertDialogAction onClick={excluir}>Excluir</AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

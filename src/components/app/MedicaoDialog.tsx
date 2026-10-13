@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { atualizarMedicao, criarMedicao, type Medicao } from "@/lib/medicoes";
 import { formatBRL, parseBRL } from "@/lib/money";
 import type { Submission } from "@/lib/types";
@@ -32,6 +33,33 @@ const MedicaoDialog = ({ open, onOpenChange, submission, medicao, onSaved }: Pro
   const [nf, setNf] = useState("");
   const [obs, setObs] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [doPi, setDoPi] = useState<number | null>(null);
+
+  // Se o PI foi emitido pelo sistema, os valores vêm dele.
+  useEffect(() => {
+    setDoPi(null);
+    if (!open || medicao || !submission) return;
+    const numero = Number(submission.numeroPi.replace(/\D/g, ""));
+    if (!numero) return;
+    let vivo = true;
+    supabase
+      .from("pedidos_insercao")
+      .select("numero, valor_bruto, comissao, clientes!inner(nome)")
+      .eq("numero", numero)
+      .eq("status", "emitido")
+      .eq("clientes.nome", submission.cliente)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!vivo || !data) return;
+        setBruto(numberToInput(Number(data.valor_bruto)));
+        setComissao(numberToInput(Number(data.comissao)));
+        setModoComissao("valor");
+        setDoPi(data.numero);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [open, medicao, submission]);
 
   useEffect(() => {
     if (!open) return;
@@ -81,6 +109,11 @@ const MedicaoDialog = ({ open, onOpenChange, submission, medicao, onSaved }: Pro
           <DialogDescription>{pi}</DialogDescription>
         </DialogHeader>
 
+        {doPi && (
+          <p className="border-l-2 border-primary/40 pl-3 text-xs text-muted-foreground">
+            Valores trazidos do PI {doPi} emitido pelo sistema. Ajuste se o faturado for diferente.
+          </p>
+        )}
         <div className="grid gap-4 py-1 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="bruto">Valor bruto (R$)</Label>

@@ -38,6 +38,7 @@ export interface ClienteDb {
   email: string | null;
   socios: Socio[];
   consultadoEm: string | null;
+  orientacoesPi: string | null;
 }
 
 export const CLIENTES_KEY = ["clientes"] as const;
@@ -76,6 +77,7 @@ export async function listClientes(): Promise<ClienteDb[]> {
     email: c.email,
     socios: Array.isArray(c.socios) ? (c.socios as unknown as Socio[]) : [],
     consultadoEm: c.consultado_em,
+    orientacoesPi: c.orientacoes_pi,
   }));
 }
 
