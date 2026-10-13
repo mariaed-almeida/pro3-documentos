@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { Lock, LogIn, Loader2 } from "lucide-react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,96 +17,100 @@ const OperadorLogin = () => {
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
 
-  // Validate `next` as a same-origin relative path before using it.
+  // `next` só vale se for caminho relativo do mesmo site.
   const rawNext = searchParams.get("next");
   const nextPath = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
-  const redirectTo = nextPath ?? "/operador";
+  const redirectTo = nextPath ?? "/app";
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        if (nextPath) {
-          window.location.href = nextPath;
-        } else {
-          navigate(redirectTo, { replace: true });
-        }
-      }
+    const go = (hasSession: boolean) => {
+      if (hasSession) navigate(redirectTo, { replace: true });
       setCheckingSession(false);
-    });
+    };
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => go(!!session));
+    supabase.auth.getSession().then(({ data: { session } }) => go(!!session));
+    return () => data.subscription.unsubscribe();
+  }, [navigate, redirectTo]);
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        if (nextPath) {
-          window.location.href = nextPath;
-        } else {
-          navigate(redirectTo, { replace: true });
-        }
-      }
-      setCheckingSession(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate, nextPath, redirectTo]);
-
-  const handleLogin = async () => {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!email || !password) {
-      toast({ title: "Campos obrigatórios", description: "Preencha e-mail e senha.", variant: "destructive" });
+      toast({ title: "Preencha e-mail e senha", variant: "destructive" });
       return;
     }
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
-    if (error) {
-      toast({ title: "Erro de autenticação", description: "E-mail ou senha incorretos.", variant: "destructive" });
-    }
+    if (error) toast({ title: "E-mail ou senha incorretos", variant: "destructive" });
   };
 
   if (checkingSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="text-center">
-          <img src={logoPro3} alt="Pro3 Comunicação" className="h-14 mx-auto mb-4" />
-          <h1 className="text-xl font-bold text-foreground flex items-center justify-center gap-2">
-            <Lock className="h-5 w-5" /> Espaço de Operações
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">Acesso restrito aos operadores</p>
-        </div>
+    <div className="grid min-h-screen lg:grid-cols-[1fr_30rem]">
+      <aside className="relative hidden flex-col justify-between border-r bg-sidebar p-12 lg:flex">
+        <img src={logoPro3} alt="Pró3 Comunicação" className="h-12 w-auto self-start" />
+        <blockquote className="max-w-lg">
+          <p className="font-serif text-4xl leading-[1.15] tracking-tight">
+            Cada PI conferido a tempo é um pagamento que não atrasa.
+          </p>
+          <footer className="mt-6 text-sm text-muted-foreground">
+            Conferência de documentos de faturamento · ALESC, Xanxerê e Chapecó
+          </footer>
+        </blockquote>
+        <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Pró3 Comunicação Ltda.</p>
+      </aside>
 
-        <div className="bg-card rounded-lg border p-6 space-y-4">
-          <div className="space-y-2">
-            <Label>E-mail</Label>
-            <Input
-              type="email"
-              placeholder="operador@pro3.com.br"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Senha</Label>
-            <Input
-              type="password"
-              placeholder="Digite a senha..."
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-            />
-          </div>
-          <Button className="w-full gap-2" onClick={handleLogin} disabled={loading}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
-            {loading ? "Entrando..." : "Entrar"}
-          </Button>
+      <main className="flex flex-col justify-center px-6 py-12 sm:px-14">
+        <img src={logoPro3} alt="Pró3 Comunicação" className="mb-10 h-10 w-auto self-start lg:hidden" />
+        <div className="w-full max-w-sm">
+          <p className="eyebrow mb-2">Espaço de operações</p>
+          <h1 className="text-3xl">Entrar</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Acesso restrito à equipe da Pró3.</p>
+
+          <form onSubmit={handleLogin} className="mt-8 space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="email">E-mail</Label>
+              <Input
+                id="email"
+                type="email"
+                autoComplete="username"
+                autoFocus
+                placeholder="nome@pro3.com.br"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="senha">Senha</Label>
+              <Input
+                id="senha"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+            <Button type="submit" className="w-full" size="lg" disabled={loading}>
+              {loading && <Loader2 className="animate-spin" />}
+              {loading ? "Entrando" : "Entrar"}
+            </Button>
+          </form>
+
+          <p className="mt-8 text-sm text-muted-foreground">
+            É um veículo de mídia?{" "}
+            <Link to="/veiculo" className="font-medium text-foreground underline-offset-4 hover:underline">
+              Enviar documentos
+            </Link>
+          </p>
         </div>
-      </div>
+      </main>
     </div>
   );
 };
