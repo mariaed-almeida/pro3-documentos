@@ -116,6 +116,17 @@ const VeiculoForm = () => {
     });
   };
 
+  // Link do e-mail de devolução: abre o formulário já com cliente, PI e contato.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const c = q.get("cliente");
+    if (c) setCliente(c as Cliente);
+    if (q.get("pi")) setNumeroPi(q.get("pi")!);
+    if (q.get("nome")) setContatoNome(q.get("nome")!);
+    if (q.get("email")) setContatoEmail(q.get("email")!);
+    if (q.get("fone")) setContatoTelefone(q.get("fone")!);
+  }, []);
+
   // PI já emitido pela agência: preenche campanha, veículo, tipo e cidade a partir do número.
   const [piEncontrado, setPiEncontrado] = useState<{ campanha: string; nome_veiculo: string; tipo_veiculo: string; praca: string | null } | null>(null);
   useEffect(() => {

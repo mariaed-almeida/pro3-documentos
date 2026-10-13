@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
 
     const { data: s } = await supabase
       .from("submissions")
-      .select("id, numero_pi, cliente, campanha, nome_veiculo, cidade, contato_nome, contato_email, data_envio")
+      .select("id, numero_pi, cliente, campanha, nome_veiculo, cidade, contato_nome, contato_email, contato_telefone, data_envio")
       .eq("id", b.submissionId)
       .single();
     if (!s) return json({ error: "Envio não encontrado" }, 404);
@@ -109,6 +109,10 @@ Deno.serve(async (req) => {
       cidade: s.cidade,
     };
 
+    const qs = new URLSearchParams({ cliente: s.cliente, pi: s.numero_pi, nome: s.contato_nome ?? "", email: s.contato_email ?? "", fone: s.contato_telefone ?? "" });
+    for (const [k, v] of [...qs]) if (!v) qs.delete(k);
+    const linkReenvio = `${REENVIO_URL}?${qs}`;
+
     let assunto: string;
     let html: string;
     let text: string;
@@ -126,7 +130,7 @@ Deno.serve(async (req) => {
       const quando = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" }).format(new Date(s.data_envio));
       ({ assunto, html, text } = montarProtocolo(dados, protocoloDe(s.id, s.data_envio), quando.replace(",", " as"), itens, agencia, LOGO_URL));
     } else {
-      ({ assunto, html, text } = montarDevolucao(dados, b.motivo, agencia, LOGO_URL, REENVIO_URL));
+      ({ assunto, html, text } = montarDevolucao(dados, b.motivo, agencia, LOGO_URL, linkReenvio));
     }
 
     const registrar = (status: "enviado" | "falhou" | "nao_configurado", erro?: string, providerId?: string) =>
